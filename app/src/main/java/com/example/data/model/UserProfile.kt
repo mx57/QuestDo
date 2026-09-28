@@ -14,6 +14,16 @@ data class UserProfile(
     val coins: Int = 50,
     val streakDays: Int = 1,
     val bestStreak: Int = 1,
+    val streakFreezes: Int = 2, // 2 freezes per month
+    val lastFreezeResetMonth: String = "", // "YYYY-MM"
+    val inRecoveryMode: Boolean = false,
+    val recoveryDaysRemaining: Int = 0,
+    val consecutiveFailures: Int = 0,
+    val currentEnergyLevel: Int = 2, // 1 = Low, 2 = Medium, 3 = High
+    val hasCompletedOnboarding: Boolean = false,
+    val showHorizon: Boolean = true, // Progress visualizer metaphor
+    val eveningCheckoutDoneToday: Boolean = false,
+    val lastEveningCheckoutDate: String = "",
     val lastActiveDate: String = "", // "YYYY-MM-DD"
     val tasksPerQuest: Int = 3, // 1, 2, 3, or 5
     val activeMood: MoodType = MoodType.FOCUS,

@@ -11,6 +11,9 @@ import androidx.lifecycle.viewModelScope
 import com.example.data.db.AppDatabase
 import com.example.data.model.*
 import com.example.data.repository.QuestRepository
+import com.example.util.DataExportImportEngine
+import com.example.util.LocalAiEngine
+import com.example.util.LocalNlpParser
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
@@ -51,6 +54,14 @@ class QuestViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList()
     )
 
+    val urgentDeadlineTasks = repository.urgentDeadlineTasks.stateIn(
+        viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList()
+    )
+
+    val staleTasks = repository.getStaleTasks(90).stateIn(
+        viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList()
+    )
+
     val completedTasks = repository.completedTasks.stateIn(
         viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList()
     )
@@ -86,6 +97,9 @@ class QuestViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _showBreathingExerciseDialog = MutableStateFlow(false)
     val showBreathingExerciseDialog: StateFlow<Boolean> = _showBreathingExerciseDialog.asStateFlow()
+
+    private val _showEveningCheckoutDialog = MutableStateFlow(false)
+    val showEveningCheckoutDialog: StateFlow<Boolean> = _showEveningCheckoutDialog.asStateFlow()
 
     private val _currentQuote = MutableStateFlow(
         MotivationalEngine.getContextualQuote(MoodType.FOCUS)
@@ -136,6 +150,68 @@ class QuestViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun setEnergyLevel(energy: Int) {
+        viewModelScope.launch {
+            val updated = userProfile.value.copy(currentEnergyLevel = energy.coerceIn(1, 3))
+            repository.updateProfile(updated)
+        }
+    }
+
+    fun completeOnboarding(tasksPerQuest: Int) {
+        viewModelScope.launch {
+            val updated = userProfile.value.copy(
+                hasCompletedOnboarding = true,
+                tasksPerQuest = tasksPerQuest.coerceIn(1, 5)
+            )
+            repository.updateProfile(updated)
+        }
+    }
+
+    fun addNlpTask(rawInput: String) {
+        viewModelScope.launch {
+            val parsed = LocalNlpParser.parseInput(rawInput)
+            val newTask = TaskItem(
+                title = parsed.title,
+                priority = parsed.priority,
+                dueDate = parsed.dueDate,
+                isStrictDeadline = parsed.isStrictDeadline
+            )
+            repository.insertTask(newTask)
+        }
+    }
+
+    fun decomposeTaskWithAi(task: TaskItem) {
+        viewModelScope.launch {
+            val steps = LocalAiEngine.decomposeTask(task.title)
+            val existing = task.getSubtasksList()
+            val newSubtasks = steps.map { SubTask(it, false) }
+            val combined = TaskItem.serializeSubtasks(existing + newSubtasks)
+            repository.updateTask(task.copy(subtasksRaw = combined))
+        }
+    }
+
+    fun startBossLevel(goalTitle: String, steps: List<String>) {
+        viewModelScope.launch {
+            repository.startBossLevel(goalTitle, steps)
+        }
+    }
+
+    fun openEveningCheckout() {
+        _showEveningCheckoutDialog.value = true
+    }
+
+    fun closeEveningCheckout() {
+        _showEveningCheckoutDialog.value = false
+    }
+
+    fun performEveningCheckout(reflection: String) {
+        viewModelScope.launch {
+            triggerHaptic(HapticType.VICTORY)
+            repository.performEveningCheckout(reflection)
+            _showEveningCheckoutDialog.value = false
+        }
+    }
+
     fun shuffleCurrentQuest() {
         viewModelScope.launch {
             triggerHaptic(HapticType.MEDIUM)
@@ -175,6 +251,32 @@ class QuestViewModel(application: Application) : AndroidViewModel(application) {
     fun bulkImportTasks(linesText: String, category: String = "Импорт") {
         viewModelScope.launch {
             repository.bulkImportTasks(linesText, category)
+        }
+    }
+
+    fun exportToJson(): String {
+        return DataExportImportEngine.exportToJson(userProfile.value, currentQuestTasks.value + backlogTasks.value)
+    }
+
+    fun exportToCsv(): String {
+        return DataExportImportEngine.exportToCsv(currentQuestTasks.value + backlogTasks.value)
+    }
+
+    fun importFromJson(jsonStr: String) {
+        viewModelScope.launch {
+            val tasks = DataExportImportEngine.parseJsonTasks(jsonStr)
+            for (t in tasks) {
+                repository.insertTask(t)
+            }
+        }
+    }
+
+    fun importFromCsv(csvStr: String) {
+        viewModelScope.launch {
+            val tasks = DataExportImportEngine.parseCsvTasks(csvStr)
+            for (t in tasks) {
+                repository.insertTask(t)
+            }
         }
     }
 
@@ -222,6 +324,13 @@ class QuestViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun toggleShowHorizon(show: Boolean) {
+        viewModelScope.launch {
+            val updated = userProfile.value.copy(showHorizon = show)
+            repository.updateProfile(updated)
+        }
+    }
+
     fun setAppIconStyle(style: AppIconStyle) {
         viewModelScope.launch {
             val updated = userProfile.value.copy(appIconStyle = style)
@@ -262,7 +371,7 @@ class QuestViewModel(application: Application) : AndroidViewModel(application) {
     private fun triggerHaptic(type: HapticType) {
         if (!userProfile.value.hapticsEnabled) return
         try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 val effect = when (type) {
                     HapticType.LIGHT -> VibrationEffect.createOneShot(35, VibrationEffect.DEFAULT_AMPLITUDE)
                     HapticType.MEDIUM -> VibrationEffect.createOneShot(70, VibrationEffect.DEFAULT_AMPLITUDE)

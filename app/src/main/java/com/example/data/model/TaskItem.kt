@@ -11,7 +11,13 @@ data class TaskItem(
     val description: String = "",
     val category: String = "Общие",
     val priority: Priority = Priority.HIGH,
+    val energyRequired: Int = 2, // 1 (low) to 5 (high)
+    val fieldWhy: String = "", // "Мостик к цели" - shown when postponing
+    val postponeCount: Int = 0, // times postponed/transferred
+    val tagsRaw: String = "", // e.g. "работа,срочно"
     val isCompleted: Boolean = false,
+    val isArchived: Boolean = false,
+    val isStrictDeadline: Boolean = false,
     val inCurrentQuest: Boolean = false,
     val questLevelId: Long? = null,
     val subtasksRaw: String = "", // e.g. "Step 1|0;Step 2|1"
@@ -31,6 +37,11 @@ data class TaskItem(
                 SubTask(title, done)
             } else null
         }
+    }
+
+    fun getTagsList(): List<String> {
+        if (tagsRaw.isBlank()) return emptyList()
+        return tagsRaw.split(",").map { it.trim() }.filter { it.isNotEmpty() }
     }
 
     companion object {

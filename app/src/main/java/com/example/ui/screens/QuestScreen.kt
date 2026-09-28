@@ -2,7 +2,6 @@ package com.example.ui.screens
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -18,7 +17,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
@@ -28,6 +26,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.model.*
+import com.example.ui.components.*
 import com.example.ui.theme.GoldAccent
 import com.example.ui.theme.StreakFire
 import com.example.ui.theme.XpPurple
@@ -36,6 +35,7 @@ import com.example.ui.theme.XpPurple
 @Composable
 fun QuestScreen(
     currentTasks: List<TaskItem>,
+    urgentTasks: List<TaskItem> = emptyList(),
     activeLevel: QuestLevel?,
     userProfile: UserProfile,
     currentQuote: MotivationalMessage,
@@ -47,6 +47,8 @@ fun QuestScreen(
     onStartFocusOnTask: (TaskItem) -> Unit,
     onOpenSOS: () -> Unit,
     onOpenBreathing: () -> Unit,
+    onOpenEveningCheckout: () -> Unit,
+    onSelectEnergy: (Int) -> Unit,
     onAddNewTask: () -> Unit,
     onClaimRewardManual: () -> Unit
 ) {
@@ -66,8 +68,68 @@ fun QuestScreen(
         item {
             HeroHeaderCard(
                 userProfile = userProfile,
-                onOpenBreathing = onOpenBreathing
+                onOpenBreathing = onOpenBreathing,
+                onOpenEveningCheckout = onOpenEveningCheckout
             )
+        }
+
+        // Energy Check-In Selector Bar
+        item {
+            EnergyCheckInBar(
+                currentEnergy = userProfile.currentEnergyLevel,
+                onSelectEnergy = onSelectEnergy
+            )
+        }
+
+        // Recovery Mode Soft Amber Notification if active
+        if (userProfile.inRecoveryMode) {
+            item {
+                Surface(
+                    shape = RoundedCornerShape(16.dp),
+                    color = GoldAccent.copy(alpha = 0.2f),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("🌱", fontSize = 24.sp)
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column {
+                            Text(
+                                text = "Режим восстановления (Мягкий перезапуск)",
+                                fontWeight = FontWeight.Bold,
+                                style = MaterialTheme.typography.titleSmall
+                            )
+                            Text(
+                                text = "Уровни временно сокращены до 1 задачи. Пауза серии без потерь.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        // Urgent Layer Banner (strict deadlines - prohibited to hide!)
+        if (urgentTasks.isNotEmpty()) {
+            item {
+                UrgentLayerBanner(
+                    urgentTasks = urgentTasks,
+                    onToggleTask = onToggleTask
+                )
+            }
+        }
+
+        // Horizon Progress Visualizer Metaphor (togglable)
+        if (userProfile.showHorizon) {
+            item {
+                HorizonProgressCard(
+                    completedQuests = userProfile.totalQuestsCompleted,
+                    totalTasksDone = userProfile.totalTasksCompleted
+                )
+            }
         }
 
         // Dynamic Motivational Quote Card
@@ -113,6 +175,41 @@ fun QuestScreen(
             }
         }
 
+        // Evening Checkout Banner Ritual
+        item {
+            Surface(
+                shape = RoundedCornerShape(20.dp),
+                color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.6f),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onOpenEveningCheckout() }
+            ) {
+                Row(
+                    modifier = Modifier.padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("🌙", fontSize = 28.sp)
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Вечерний чек-аут ритуал",
+                            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold)
+                        )
+                        Text(
+                            text = "30-секундная рефлексия и закрытие уровня дня",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onTertiaryContainer
+                        )
+                    }
+                    Icon(
+                        Icons.Default.ChevronRight,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onTertiaryContainer
+                    )
+                }
+            }
+        }
+
         // Anti-Procrastination Assistant Footer
         item {
             Surface(
@@ -154,7 +251,8 @@ fun QuestScreen(
 @Composable
 fun HeroHeaderCard(
     userProfile: UserProfile,
-    onOpenBreathing: () -> Unit
+    onOpenBreathing: () -> Unit,
+    onOpenEveningCheckout: () -> Unit
 ) {
     Card(
         shape = RoundedCornerShape(24.dp),
@@ -204,7 +302,7 @@ fun HeroHeaderCard(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    // Streak Badge
+                    // Streak Badge (with Freeze icon if active)
                     Surface(
                         shape = RoundedCornerShape(12.dp),
                         color = StreakFire.copy(alpha = 0.15f)
@@ -216,7 +314,7 @@ fun HeroHeaderCard(
                             Text("🔥", fontSize = 14.sp)
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
-                                text = "${userProfile.streakDays} дн.",
+                                text = "${userProfile.streakDays} дн. (❄️${userProfile.streakFreezes})",
                                 style = MaterialTheme.typography.labelMedium.copy(
                                     fontWeight = FontWeight.Bold,
                                     color = StreakFire
@@ -513,6 +611,12 @@ fun QuestTaskCard(
                         }
 
                         Text(
+                            text = "⚡${task.energyRequired}",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.secondary
+                        )
+
+                        Text(
                             text = "⏱ ${task.estimatedMinutes} мин",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -531,6 +635,17 @@ fun QuestTaskCard(
                         maxLines = 3,
                         overflow = TextOverflow.Ellipsis
                     )
+
+                    if (task.fieldWhy.isNotBlank()) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "🎯 Зачем: ${task.fieldWhy}",
+                            style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
+                            color = MaterialTheme.colorScheme.primary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
 
                     if (task.description.isNotBlank()) {
                         Spacer(modifier = Modifier.height(4.dp))

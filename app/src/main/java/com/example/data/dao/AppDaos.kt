@@ -10,17 +10,26 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface TaskDao {
-    @Query("SELECT * FROM tasks ORDER BY isCompleted ASC, priority DESC, createdAt DESC")
+    @Query("SELECT * FROM tasks WHERE isArchived = 0 ORDER BY isCompleted ASC, priority DESC, createdAt DESC")
     fun getAllTasks(): Flow<List<TaskItem>>
 
-    @Query("SELECT * FROM tasks WHERE inCurrentQuest = 1 ORDER BY isCompleted ASC, priority DESC, id ASC")
+    @Query("SELECT * FROM tasks WHERE inCurrentQuest = 1 AND isCompleted = 0 AND isArchived = 0 ORDER BY priority DESC, id ASC")
     fun getCurrentQuestTasks(): Flow<List<TaskItem>>
 
-    @Query("SELECT * FROM tasks WHERE inCurrentQuest = 0 AND isCompleted = 0 ORDER BY priority DESC, createdAt DESC")
+    @Query("SELECT * FROM tasks WHERE inCurrentQuest = 0 AND isCompleted = 0 AND isArchived = 0 ORDER BY priority DESC, createdAt DESC")
     fun getBacklogTasks(): Flow<List<TaskItem>>
+
+    @Query("SELECT * FROM tasks WHERE isStrictDeadline = 1 AND isCompleted = 0 AND isArchived = 0 ORDER BY dueDate ASC")
+    fun getUrgentDeadlineTasks(): Flow<List<TaskItem>>
 
     @Query("SELECT * FROM tasks WHERE isCompleted = 1 ORDER BY completedAt DESC")
     fun getCompletedTasks(): Flow<List<TaskItem>>
+
+    @Query("SELECT * FROM tasks WHERE isArchived = 1 ORDER BY createdAt DESC")
+    fun getArchivedTasks(): Flow<List<TaskItem>>
+
+    @Query("SELECT * FROM tasks WHERE isCompleted = 0 AND isArchived = 0 AND createdAt <= :thresholdTimestamp")
+    fun getStaleTasks(thresholdTimestamp: Long): Flow<List<TaskItem>>
 
     @Query("SELECT * FROM tasks WHERE id = :id LIMIT 1")
     suspend fun getTaskById(id: Long): TaskItem?
@@ -46,7 +55,7 @@ interface TaskDao {
     @Query("UPDATE tasks SET inCurrentQuest = 1 WHERE id IN (:taskIds)")
     suspend fun markTasksInCurrentQuest(taskIds: List<Long>)
 
-    @Query("SELECT COUNT(*) FROM tasks WHERE isCompleted = 0")
+    @Query("SELECT COUNT(*) FROM tasks WHERE isCompleted = 0 AND isArchived = 0")
     fun getActiveTasksCount(): Flow<Int>
 
     @Query("SELECT COUNT(*) FROM tasks WHERE isCompleted = 1")
