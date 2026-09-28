@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Subtle shield drop shadow -->
+    <path
+        android:pathData="M54,26 L76,33 C76,57 65,74 54,82 C43,74 32,57 32,33 Z"
+        android:fillColor="#33000000" />
+
+    <!-- Outer Crest / Shield Body -->
+    <path
+        android:pathData="M54,24 L75,31 C75,55 64,72 54,80 C44,72 33,55 33,31 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="54"
+                android:startY="24"
+                android:endX="54"
+                android:endY="80"
+                android:type="linear">
+                <item android:offset="0.0" android:color="#FFD54F" />
+                <item android:offset="0.6" android:color="#FFA000" />
+                <item android:offset="1.0" android:color="#E65100" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Inner Shield Inset (Deep Violet / Obsidian) -->
+    <path
+        android:pathData="M54,28 L71,34.5 C71,53.5 61.5,67.5 54,74 C46.5,67.5 37,53.5 37,34.5 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="54"
+                android:startY="28"
+                android:endX="54"
+                android:endY="74"
+                android:type="linear">
+                <item android:offset="0.0" android:color="#241442" />
+                <item android:offset="1.0" android:color="#120A24" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Glowing Quest Star at top of shield -->
+    <path
+        android:pathData="M54,34 L56.2,39.5 L62,40 L57.5,43.5 L59,49 L54,46 L49,49 L50.5,43.5 L46,40 L51.8,39.5 Z"
+        android:fillColor="#FFE082" />
+
+    <!-- Bold Checkmark / Victory Glyph in center -->
+    <path
+        android:pathData="M46,55 L51.5,61 L63.5,48"
+        android:strokeColor="#00E676"
+        android:strokeWidth="4"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:fillColor="#00000000" />
+
+    <!-- Highlight shimmer on shield edge -->
+    <path
+        android:pathData="M54,24 L75,31 C75,37 73.5,44 71.5,50 C68.5,42 63,33 54,29 Z"
+        android:fillColor="#44FFFFFF" />
+</vector>

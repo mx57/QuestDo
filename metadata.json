@@ -1,0 +1,6 @@
+{
+  "name": "QuestDo",
+  "description": "Геймифицированный планировщик задач: система микро-квестов, мотивация, награды и фокус-таймер",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
