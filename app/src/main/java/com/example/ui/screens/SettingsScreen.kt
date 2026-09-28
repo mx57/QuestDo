@@ -1,5 +1,6 @@
 package com.example.ui.screens
 
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -14,6 +15,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -27,10 +29,17 @@ fun SettingsScreen(
     onSetMood: (MoodType) -> Unit,
     onSetThemeMode: (ThemeMode) -> Unit,
     onSetTasksPerQuest: (Int) -> Unit,
+    onToggleShowHorizon: (Boolean) -> Unit,
     onSetAppIconStyle: (AppIconStyle) -> Unit,
-    onSetNotificationTone: (NotificationTone) -> Unit
+    onSetNotificationTone: (NotificationTone) -> Unit,
+    onExportJson: () -> String,
+    onExportCsv: () -> String,
+    onImportJson: (String) -> Unit,
+    onReRunOnboarding: () -> Unit
 ) {
-    var showWidgetInstructions by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    var showExportDialog by remember { mutableStateOf(false) }
+    var exportContent by remember { mutableStateOf("") }
 
     LazyColumn(
         modifier = Modifier
@@ -39,6 +48,31 @@ fun SettingsScreen(
         contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 96.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
+        // Free & Anti-Paywall Banner
+        item {
+            Card(
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = GoldAccent.copy(alpha = 0.2f)),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier.padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("💎", fontSize = 28.sp)
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column {
+                        Text("100% Бесплатно & Без Рекламы", fontWeight = FontWeight.Bold)
+                        Text(
+                            "Все функции, AI-инструменты и аналитика доступны в полном объеме.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+        }
+
         // Section: Difficulty & Quest Length
         item {
             Card(
@@ -77,6 +111,39 @@ fun SettingsScreen(
                             )
                         }
                     }
+                }
+            }
+        }
+
+        // Section: Horizon Progress Visualizer Metaphor Toggle
+        item {
+            Card(
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(18.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "🏰 Метафора прогресса «Горизонт»",
+                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
+                        )
+                        Text(
+                            text = "Отображает визуальный прогресс («Башня очищена на 34%») вместо скрытых списков.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Switch(
+                        checked = userProfile.showHorizon,
+                        onCheckedChange = { onToggleShowHorizon(it) }
+                    )
                 }
             }
         }
@@ -175,7 +242,7 @@ fun SettingsScreen(
             }
         }
 
-        // Section: App Icon Style Customizer
+        // Section: Data Export and Import (JSON / CSV - No Lock-in)
         item {
             Card(
                 shape = RoundedCornerShape(20.dp),
@@ -184,11 +251,11 @@ fun SettingsScreen(
             ) {
                 Column(modifier = Modifier.padding(18.dp)) {
                     Text(
-                        text = "📱 Стиль иконки приложения",
+                        text = "📁 Экспорт и Импорт данных (Без Lock-in)",
                         style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
                     )
                     Text(
-                        text = "Персонализируйте герб приложения на экране и в виджетах:",
+                        text = "Ваши данные принадлежат только вам. Экспортируйте задачи в любой момент.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(top = 4.dp, bottom = 12.dp)
@@ -196,141 +263,67 @@ fun SettingsScreen(
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        AppIconStyle.values().forEach { iconStyle ->
-                            val isSelected = userProfile.appIconStyle == iconStyle
-                            Column(
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                modifier = Modifier
-                                    .clickable { onSetAppIconStyle(iconStyle) }
-                                    .padding(4.dp)
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(48.dp)
-                                        .clip(CircleShape)
-                                        .background(
-                                            if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant
-                                        ),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text(iconStyle.emoji, fontSize = 24.sp)
-                                }
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text(
-                                    text = iconStyle.titleRu.split(" ").first(),
-                                    style = MaterialTheme.typography.labelSmall.copy(
-                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                        color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                                    ),
-                                    fontSize = 10.sp
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // Section: Notification & Mentor Tone
-        item {
-            Card(
-                shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(modifier = Modifier.padding(18.dp)) {
-                    Text(
-                        text = "🔔 Тональность мотивации",
-                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    NotificationTone.values().forEach { tone ->
-                        val isSelected = userProfile.notificationTone == tone
-                        Surface(
-                            shape = RoundedCornerShape(12.dp),
-                            color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 4.dp)
-                                .clickable { onSetNotificationTone(tone) }
+                        OutlinedButton(
+                            onClick = {
+                                exportContent = onExportJson()
+                                showExportDialog = true
+                            },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(12.dp)
                         ) {
-                            Column(modifier = Modifier.padding(12.dp)) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    RadioButton(selected = isSelected, onClick = { onSetNotificationTone(tone) })
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text(tone.titleRu, fontWeight = FontWeight.Bold)
-                                }
-                                Text(
-                                    text = "«${tone.sampleMessage}»",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.padding(start = 32.dp)
-                                )
-                            }
+                            Text("Экспорт JSON", fontSize = 12.sp)
+                        }
+
+                        OutlinedButton(
+                            onClick = {
+                                exportContent = onExportCsv()
+                                showExportDialog = true
+                            },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Text("Экспорт CSV", fontSize = 12.sp)
                         }
                     }
-                }
-            }
-        }
 
-        // Section: Desktop Widget Preview
-        item {
-            Card(
-                shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(modifier = Modifier.padding(18.dp)) {
-                    Text(
-                        text = "📲 Виджет для рабочего стола Android",
-                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
-                    )
-                    Text(
-                        text = "Отображает текущий микро-квест и мотивацию дня прямо на экране телефона.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(top = 4.dp, bottom = 12.dp)
-                    )
-
-                    // Widget Interactive Live Preview
-                    Surface(
-                        shape = RoundedCornerShape(20.dp),
-                        color = MaterialTheme.colorScheme.surfaceVariant,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 6.dp)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    OutlinedButton(
+                        onClick = onReRunOnboarding,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp)
                     ) {
-                        Column(modifier = Modifier.padding(16.dp)) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text(userProfile.appIconStyle.emoji, fontSize = 20.sp)
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text("QuestDo Widget", fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                                }
-                                Text("🔥 ${userProfile.streakDays} дн.", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = GoldAccent)
-                            }
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text("Уровень ${userProfile.level}: Врата Концентрации", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
-                            Text("Закрыто 2/3 задач • Опыт +120 XP", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Spacer(modifier = Modifier.height(6.dp))
-                            LinearProgressIndicator(
-                                progress = { 0.66f },
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(6.dp)
-                                    .clip(RoundedCornerShape(3.dp)),
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                        }
+                        Text("Пройти онбординг заново 🚀", fontSize = 12.sp)
                     }
                 }
             }
         }
+    }
+
+    if (showExportDialog) {
+        AlertDialog(
+            onDismissRequest = { showExportDialog = false },
+            title = { Text("Данные экспортного файла", fontWeight = FontWeight.Bold) },
+            text = {
+                OutlinedTextField(
+                    value = exportContent,
+                    onValueChange = {},
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(250.dp),
+                    readOnly = true,
+                    shape = RoundedCornerShape(12.dp)
+                )
+            },
+            confirmButton = {
+                Button(onClick = {
+                    Toast.makeText(context, "Данные скопированы!", Toast.LENGTH_SHORT).show()
+                    showExportDialog = false
+                }) {
+                    Text("Закрыть")
+                }
+            }
+        )
     }
 }

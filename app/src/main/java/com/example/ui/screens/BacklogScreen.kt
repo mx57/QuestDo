@@ -1,5 +1,6 @@
 package com.example.ui.screens
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -19,11 +20,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.model.Priority
 import com.example.data.model.TaskItem
+import com.example.ui.theme.GoldAccent
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BacklogScreen(
     backlogTasks: List<TaskItem>,
+    staleTasks: List<TaskItem> = emptyList(),
     completedTasks: List<TaskItem>,
     searchQuery: String,
     onSearchQueryChange: (String) -> Unit,
@@ -31,10 +34,13 @@ fun BacklogScreen(
     onSelectPriority: (Priority?) -> Unit,
     onToggleTask: (TaskItem) -> Unit,
     onEditTask: (TaskItem) -> Unit,
+    onDecomposeTask: (TaskItem) -> Unit,
+    onStartBossLevel: (title: String, steps: List<String>) -> Unit,
     onOpenBulkImport: () -> Unit,
     onAddNewTask: () -> Unit
 ) {
     var selectedTab by remember { mutableIntStateOf(0) } // 0: Бэклог, 1: Архив выполненных
+    var showBossDialog by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
@@ -78,6 +84,18 @@ fun BacklogScreen(
                 ) {
                     Icon(Icons.Default.UploadFile, contentDescription = "Массовый импорт")
                 }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Boss level launcher button
+            Button(
+                onClick = { showBossDialog = true },
+                colors = ButtonDefaults.buttonColors(containerColor = GoldAccent),
+                shape = RoundedCornerShape(14.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("⚔️ Запустить Босс-Цель Недели", color = androidx.compose.ui.graphics.Color.Black, fontWeight = FontWeight.Bold)
             }
 
             Spacer(modifier = Modifier.height(10.dp))
@@ -126,6 +144,41 @@ fun BacklogScreen(
                     onClick = { selectedTab = 1 },
                     text = { Text("Завершено (${completedTasks.size})", fontWeight = FontWeight.SemiBold) }
                 )
+            }
+        }
+
+        // Weekly Review Card if stale tasks (90+ days) exist
+        if (selectedTab == 0 && staleTasks.isNotEmpty()) {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 6.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                Column(modifier = Modifier.padding(14.dp)) {
+                    Text(
+                        text = "🧹 Недельный обзор: ${staleTasks.size} задач висят 90+ дней",
+                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold)
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "Старые задачи забирают энергию. Давайте разобьем их или архивируем!",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer
+                    )
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(
+                            onClick = {
+                                staleTasks.firstOrNull()?.let { onDecomposeTask(it) }
+                            },
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Text("Разбить ✨", fontSize = 12.sp)
+                        }
+                    }
+                }
             }
         }
 
@@ -179,6 +232,16 @@ fun BacklogScreen(
                 }
             }
         }
+    }
+
+    if (showBossDialog) {
+        BossGoalCreationDialog(
+            onCreateBoss = { title, steps ->
+                onStartBossLevel(title, steps)
+                showBossDialog = false
+            },
+            onDismiss = { showBossDialog = false }
+        )
     }
 }
 
@@ -271,4 +334,71 @@ fun BacklogItemCard(
             }
         }
     }
+}
+
+@Composable
+fun BossGoalCreationDialog(
+    onCreateBoss: (title: String, steps: List<String>) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var bossTitle by remember { mutableStateOf("") }
+    var step1 by remember { mutableStateOf("") }
+    var step2 by remember { mutableStateOf("") }
+    var step3 by remember { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text("⚔️ Главная Босс-Цель Недели", fontWeight = FontWeight.Bold)
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    "Создайте 1 крупную цель и 3 ключевых шага для её завоевания. Награда: +350 XP и +100 Монет!",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                OutlinedTextField(
+                    value = bossTitle,
+                    onValueChange = { bossTitle = it },
+                    label = { Text("Название Босс-Цели *") },
+                    placeholder = { Text("Например: Запустить коммерческий проект") },
+                    singleLine = true
+                )
+                OutlinedTextField(
+                    value = step1,
+                    onValueChange = { step1 = it },
+                    label = { Text("Шаг 1") },
+                    singleLine = true
+                )
+                OutlinedTextField(
+                    value = step2,
+                    onValueChange = { step2 = it },
+                    label = { Text("Шаг 2") },
+                    singleLine = true
+                )
+                OutlinedTextField(
+                    value = step3,
+                    onValueChange = { step3 = it },
+                    label = { Text("Шаг 3") },
+                    singleLine = true
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    val steps = listOf(step1, step2, step3).filter { it.isNotBlank() }.ifEmpty { listOf("Первый шаг к цели") }
+                    onCreateBoss(bossTitle.trim(), steps)
+                },
+                enabled = bossTitle.isNotBlank(),
+                colors = ButtonDefaults.buttonColors(containerColor = GoldAccent)
+            ) {
+                Text("Начать Битву 🔥", fontWeight = FontWeight.Bold, color = androidx.compose.ui.graphics.Color.Black)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Отмена") }
+        }
+    )
 }

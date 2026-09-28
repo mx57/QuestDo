@@ -2,6 +2,7 @@ package com.example.data.repository
 
 import com.example.data.dao.*
 import com.example.data.model.*
+import com.example.util.TaskScoringEngine
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.firstOrNull
@@ -19,12 +20,19 @@ class QuestRepository(
     val allTasks: Flow<List<TaskItem>> = taskDao.getAllTasks()
     val currentQuestTasks: Flow<List<TaskItem>> = taskDao.getCurrentQuestTasks()
     val backlogTasks: Flow<List<TaskItem>> = taskDao.getBacklogTasks()
+    val urgentDeadlineTasks: Flow<List<TaskItem>> = taskDao.getUrgentDeadlineTasks()
     val completedTasks: Flow<List<TaskItem>> = taskDao.getCompletedTasks()
+    val archivedTasks: Flow<List<TaskItem>> = taskDao.getArchivedTasks()
     val activeLevel: Flow<QuestLevel?> = questLevelDao.getActiveLevel()
     val completedLevelsCount: Flow<Int> = questLevelDao.getCompletedLevelsCount()
     val userProfile: Flow<UserProfile?> = userProfileDao.getUserProfile()
     val customRewards: Flow<List<CustomReward>> = customRewardDao.getAllRewards()
     val badges: Flow<List<BadgeAchievement>> = badgeDao.getAllBadges()
+
+    fun getStaleTasks(daysOld: Int = 90): Flow<List<TaskItem>> {
+        val threshold = System.currentTimeMillis() - (daysOld.toLong() * 24 * 60 * 60 * 1000)
+        return taskDao.getStaleTasks(threshold)
+    }
 
     suspend fun initializeDefaultsIfNeeded() = withContext(Dispatchers.IO) {
         val existingProfile = userProfileDao.getUserProfile().firstOrNull()
@@ -38,6 +46,8 @@ class QuestRepository(
                 coins = 50,
                 streakDays = 1,
                 bestStreak = 1,
+                streakFreezes = 2,
+                lastFreezeResetMonth = getCurrentMonthString(),
                 lastActiveDate = getTodayDateString(),
                 tasksPerQuest = 3,
                 activeMood = MoodType.FOCUS,
@@ -48,6 +58,17 @@ class QuestRepository(
                 hapticsEnabled = true
             )
             userProfileDao.insertOrUpdateProfile(defaultProfile)
+        } else {
+            // Check monthly reset for streak freezes
+            val currentMonth = getCurrentMonthString()
+            if (existingProfile.lastFreezeResetMonth != currentMonth) {
+                userProfileDao.insertOrUpdateProfile(
+                    existingProfile.copy(
+                        streakFreezes = 2,
+                        lastFreezeResetMonth = currentMonth
+                    )
+                )
+            }
         }
 
         // Initialize default badges if not present
@@ -60,6 +81,7 @@ class QuestRepository(
                 BadgeAchievement("FOCUS_50", "Мастер потока", "Проведите 50 минут в фокус-таймере", "⏳"),
                 BadgeAchievement("CENTURION", "Сотня подвигов", "Выполните 100 задач из бэклога", "👑"),
                 BadgeAchievement("SELF_CARE", "В гармонии с собой", "Активируйте режим заботы и выполните квест", "🌸"),
+                BadgeAchievement("BOSS_SLAYER", "Победитель Босса", "Сокрушите недельного Босса Прокрастинации", "🐉"),
                 BadgeAchievement("NIGHT_OWL", "Вечерний стратег", "Завершите квест в вечернее время", "🦉")
             )
             badgeDao.insertAllBadges(defaultBadges)
@@ -89,6 +111,7 @@ class QuestRepository(
                     description = "Чистый стол — чистая голова. Освободи пространство перед штурмом.",
                     category = "Фокус",
                     priority = Priority.CRITICAL,
+                    energyRequired = 1,
                     inCurrentQuest = true,
                     subtasksRaw = "Выбросить бумажки|0;Протереть экран и пыль|0;Налить стакан воды|0"
                 ),
@@ -97,6 +120,7 @@ class QuestRepository(
                     description = "Сфокусируйся на самом важном деле, которое сдвинет проект вперед.",
                     category = "Работа",
                     priority = Priority.CRITICAL,
+                    energyRequired = 2,
                     inCurrentQuest = true,
                     subtasksRaw = "Открыть проект|0;Сформулировать первый шаг|0"
                 ),
@@ -105,15 +129,17 @@ class QuestRepository(
                     description = "Психологическая настройка: вдох 4 сек, задержка 4 сек, выдох 4 сек.",
                     category = "Здоровье",
                     priority = Priority.HIGH,
+                    energyRequired = 1,
                     inCurrentQuest = true,
                     subtasksRaw = "Закрыть глаза|0;Сделать цикл дыхания|0"
                 ),
-                // Backlog tasks (waiting for next levels)
+                // Backlog tasks
                 TaskItem(
                     title = "Разобрать входящие письма и сообщения",
                     description = "Ответить на срочные, архивировать спам",
                     category = "Работа",
                     priority = Priority.HIGH,
+                    energyRequired = 2,
                     inCurrentQuest = false
                 ),
                 TaskItem(
@@ -121,6 +147,7 @@ class QuestRepository(
                     description = "Размять спину и плечи",
                     category = "Здоровье",
                     priority = Priority.HIGH,
+                    energyRequired = 2,
                     inCurrentQuest = false
                 ),
                 TaskItem(
@@ -128,20 +155,7 @@ class QuestRepository(
                     description = "Без отвлечений на уведомления",
                     category = "Развитие",
                     priority = Priority.MEDIUM,
-                    inCurrentQuest = false
-                ),
-                TaskItem(
-                    title = "Составить меню и список покупок на неделю",
-                    description = "Сбережет время и силы на принятие решений",
-                    category = "Дом",
-                    priority = Priority.LOW,
-                    inCurrentQuest = false
-                ),
-                TaskItem(
-                    title = "Запланировать бюджет на следующий месяц",
-                    description = "Подвести итоги доходов и обязательных платежей",
-                    category = "Финансы",
-                    priority = Priority.HIGH,
+                    energyRequired = 2,
                     inCurrentQuest = false
                 )
             )
@@ -170,10 +184,6 @@ class QuestRepository(
         taskDao.deleteTask(task)
     }
 
-    suspend fun deleteTaskById(id: Long) = withContext(Dispatchers.IO) {
-        taskDao.deleteTaskById(id)
-    }
-
     suspend fun toggleSubtask(task: TaskItem, subtaskIndex: Int) = withContext(Dispatchers.IO) {
         val subtasks = task.getSubtasksList().toMutableList()
         if (subtaskIndex in subtasks.indices) {
@@ -198,7 +208,6 @@ class QuestRepository(
         taskDao.updateTask(updated)
 
         if (newStatus) {
-            // Update stats
             val profile = userProfileDao.getUserProfile().firstOrNull() ?: UserProfile()
             val updatedProfile = profile.copy(
                 totalTasksCompleted = profile.totalTasksCompleted + 1,
@@ -207,7 +216,6 @@ class QuestRepository(
             )
             updateProfileAndCheckLevelUp(updatedProfile)
 
-            // Check if current quest is now fully cleared
             val currentQuestTasks = taskDao.getCurrentQuestTasks().firstOrNull() ?: emptyList()
             val allCleared = currentQuestTasks.isNotEmpty() && currentQuestTasks.all { it.isCompleted }
             return@withContext allCleared
@@ -224,17 +232,27 @@ class QuestRepository(
         )
         questLevelDao.updateLevel(completed)
 
-        // Award XP and Coins
         val profile = userProfileDao.getUserProfile().firstOrNull() ?: UserProfile()
         val today = getTodayDateString()
         val isConsecutive = isConsecutiveDay(profile.lastActiveDate, today)
-        val newStreak = if (profile.lastActiveDate == today) {
-            profile.streakDays
+
+        var newStreak = profile.streakDays
+        var freezesLeft = profile.streakFreezes
+
+        if (profile.lastActiveDate == today) {
+            // Already active today
         } else if (isConsecutive) {
-            profile.streakDays + 1
+            newStreak += 1
         } else {
-            1
+            // Day missed - check streak freeze protection!
+            if (freezesLeft > 0) {
+                freezesLeft -= 1 // Protect streak!
+            } else {
+                // Soft restart without guilt
+                newStreak = 1
+            }
         }
+
         val bestStreak = maxOf(profile.bestStreak, newStreak)
 
         val updatedProfile = profile.copy(
@@ -243,13 +261,13 @@ class QuestRepository(
             totalQuestsCompleted = profile.totalQuestsCompleted + 1,
             streakDays = newStreak,
             bestStreak = bestStreak,
+            streakFreezes = freezesLeft,
+            consecutiveFailures = 0, // reset failure streak
             lastActiveDate = today
         )
         updateProfileAndCheckLevelUp(updatedProfile)
 
-        // Check badges
         checkBadges(updatedProfile)
-
         return@withContext completed
     }
 
@@ -257,13 +275,18 @@ class QuestRepository(
         taskDao.clearCurrentQuest()
 
         val profile = userProfileDao.getUserProfile().firstOrNull() ?: UserProfile()
-        val targetCount = profile.tasksPerQuest.coerceIn(1, 5)
-
         val backlog = taskDao.getBacklogTasks().firstOrNull() ?: emptyList()
-        val nextTasks = backlog.take(targetCount)
 
-        if (nextTasks.isNotEmpty()) {
-            taskDao.markTasksInCurrentQuest(nextTasks.map { it.id })
+        // Use TaskScoringEngine to pick best tasks based on energy, rules, and recovery mode
+        val selectedTasks = TaskScoringEngine.assembleLevelTasks(
+            backlog = backlog,
+            targetCount = profile.tasksPerQuest,
+            userEnergyLevel = profile.currentEnergyLevel,
+            isRecoveryMode = profile.inRecoveryMode
+        )
+
+        if (selectedTasks.isNotEmpty()) {
+            taskDao.markTasksInCurrentQuest(selectedTasks.map { it.id })
         }
 
         val completedCount = questLevelDao.getCompletedLevelsCount().firstOrNull() ?: 0
@@ -291,27 +314,83 @@ class QuestRepository(
         return@withContext newLevel
     }
 
+    suspend fun startBossLevel(bossGoalTitle: String, steps: List<String>): QuestLevel = withContext(Dispatchers.IO) {
+        taskDao.clearCurrentQuest()
+
+        val bossTask = TaskItem(
+            title = "⚔️ БОСС: $bossGoalTitle",
+            description = "Главная цель недели! Закрой все шаги для сокрушения Босса.",
+            category = "Босс-Цель",
+            priority = Priority.CRITICAL,
+            energyRequired = 4,
+            inCurrentQuest = true,
+            subtasksRaw = TaskItem.serializeSubtasks(steps.map { SubTask(it, false) })
+        )
+        val taskId = taskDao.insertTask(bossTask)
+
+        val completedCount = questLevelDao.getCompletedLevelsCount().firstOrNull() ?: 0
+        val nextNumber = completedCount + 1
+        val bossLevel = QuestLevel(
+            levelNumber = nextNumber,
+            title = "🔥 БОСС-УРОВЕНЬ: $bossGoalTitle",
+            isBossLevel = true,
+            bossName = bossGoalTitle,
+            bossIconEmoji = "🐉",
+            startedAt = System.currentTimeMillis(),
+            xpEarned = 350,
+            coinsEarned = 100
+        )
+        questLevelDao.insertLevel(bossLevel)
+        return@withContext bossLevel
+    }
+
     suspend fun shuffleCurrentQuest() = withContext(Dispatchers.IO) {
-        // Return uncompleted current quest tasks to backlog, then pick different ones
         val currentTasks = taskDao.getCurrentQuestTasks().firstOrNull() ?: emptyList()
         val uncompleted = currentTasks.filter { !it.isCompleted }
+
+        // Track postpones for uncompleted tasks
+        for (t in uncompleted) {
+            val newPostponeCount = t.postponeCount + 1
+            taskDao.updateTask(t.copy(postponeCount = newPostponeCount))
+        }
+
         taskDao.clearCurrentQuest()
 
         val profile = userProfileDao.getUserProfile().firstOrNull() ?: UserProfile()
-        val targetCount = profile.tasksPerQuest.coerceIn(1, 5)
+        val newFailures = profile.consecutiveFailures + 1
 
-        // Put uncompleted at the end by updating their created timestamps slightly, then pick fresh ones
-        val allBacklog = taskDao.getBacklogTasks().firstOrNull() ?: emptyList()
-        val candidates = allBacklog.filterNot { item -> uncompleted.any { it.id == item.id } }
-        val freshPicks = if (candidates.size >= targetCount) {
-            candidates.take(targetCount)
-        } else {
-            allBacklog.take(targetCount)
-        }
+        // Check trigger for Recovery Mode (after 3 failures/reshuffles)
+        val entersRecovery = newFailures >= 3 || profile.inRecoveryMode
+        val updatedProfile = profile.copy(
+            consecutiveFailures = newFailures,
+            inRecoveryMode = entersRecovery,
+            recoveryDaysRemaining = if (entersRecovery) 3 else 0
+        )
+        userProfileDao.insertOrUpdateProfile(updatedProfile)
+
+        val backlog = taskDao.getBacklogTasks().firstOrNull() ?: emptyList()
+        val freshPicks = TaskScoringEngine.assembleLevelTasks(
+            backlog = backlog.filterNot { item -> uncompleted.any { it.id == item.id } }.ifEmpty { backlog },
+            targetCount = updatedProfile.tasksPerQuest,
+            userEnergyLevel = updatedProfile.currentEnergyLevel,
+            isRecoveryMode = updatedProfile.inRecoveryMode
+        )
 
         if (freshPicks.isNotEmpty()) {
             taskDao.markTasksInCurrentQuest(freshPicks.map { it.id })
         }
+    }
+
+    suspend fun performEveningCheckout(reflectionText: String) = withContext(Dispatchers.IO) {
+        val profile = userProfileDao.getUserProfile().firstOrNull() ?: return@withContext
+        val today = getTodayDateString()
+        val updated = profile.copy(
+            eveningCheckoutDoneToday = true,
+            lastEveningCheckoutDate = today,
+            coins = profile.coins + 15,
+            xp = profile.xp + 50
+        )
+        updateProfileAndCheckLevelUp(updated)
     }
 
     suspend fun bulkImportTasks(linesText: String, defaultCategory: String = "Импорт") = withContext(Dispatchers.IO) {
@@ -439,6 +518,11 @@ class QuestRepository(
 
     private fun getTodayDateString(): String {
         val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.US)
+        return sdf.format(Date())
+    }
+
+    private fun getCurrentMonthString(): String {
+        val sdf = SimpleDateFormat("yyyy-MM", Locale.US)
         return sdf.format(Date())
     }
 

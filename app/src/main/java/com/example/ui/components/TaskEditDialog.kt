@@ -1,6 +1,5 @@
 package com.example.ui.components
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -8,6 +7,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.*
@@ -24,6 +24,8 @@ import com.example.data.model.Priority
 import com.example.data.model.RecurrenceRule
 import com.example.data.model.SubTask
 import com.example.data.model.TaskItem
+import com.example.util.LocalAiEngine
+import com.example.util.LocalNlpParser
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -37,6 +39,9 @@ fun TaskEditDialog(
     var description by remember { mutableStateOf(initialTask?.description ?: "") }
     var category by remember { mutableStateOf(initialTask?.category ?: "Работа") }
     var priority by remember { mutableStateOf(initialTask?.priority ?: Priority.HIGH) }
+    var energyRequired by remember { mutableIntStateOf(initialTask?.energyRequired ?: 2) }
+    var fieldWhy by remember { mutableStateOf(initialTask?.fieldWhy ?: "") }
+    var isStrictDeadline by remember { mutableStateOf(initialTask?.isStrictDeadline ?: false) }
     var recurrence by remember { mutableStateOf(initialTask?.recurrence ?: RecurrenceRule.NONE) }
     var estimatedMinutes by remember { mutableIntStateOf(initialTask?.estimatedMinutes ?: 25) }
     var inCurrentQuest by remember { mutableStateOf(initialTask?.inCurrentQuest ?: false) }
@@ -55,7 +60,7 @@ fun TaskEditDialog(
         Surface(
             modifier = Modifier
                 .fillMaxWidth(0.95f)
-                .fillMaxHeight(0.90f)
+                .fillMaxHeight(0.92f)
                 .testTag("task_edit_dialog"),
             shape = RoundedCornerShape(24.dp),
             color = MaterialTheme.colorScheme.surface,
@@ -87,16 +92,36 @@ fun TaskEditDialog(
                     modifier = Modifier.weight(1f),
                     verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
-                    // Title field
+                    // Title field with NLP auto-parse feature
                     item {
                         OutlinedTextField(
                             value = title,
-                            onValueChange = { title = it },
-                            label = { Text("Название задачи / шага *") },
-                            placeholder = { Text("Например: Написать 1 главу статьи") },
+                            onValueChange = { input ->
+                                title = input
+                                if (initialTask == null && (input.contains("завтра") || input.startsWith("!"))) {
+                                    val parsed = LocalNlpParser.parseInput(input)
+                                    priority = parsed.priority
+                                    isStrictDeadline = parsed.isStrictDeadline
+                                }
+                            },
+                            label = { Text("Название задачи / NLP ввода *") },
+                            placeholder = { Text("Например: !срочно позвонить маме завтра") },
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .testTag("task_title_input"),
+                            singleLine = true,
+                            shape = RoundedCornerShape(14.dp)
+                        )
+                    }
+
+                    // Field "Why" («Зачем» / «Мостик к цели»)
+                    item {
+                        OutlinedTextField(
+                            value = fieldWhy,
+                            onValueChange = { fieldWhy = it },
+                            label = { Text("«Зачем» — Мостик к высшей цели 🎯") },
+                            placeholder = { Text("Почему это важно сделать? (покажется при попытке отложить)") },
+                            modifier = Modifier.fillMaxWidth(),
                             singleLine = true,
                             shape = RoundedCornerShape(14.dp)
                         )
@@ -111,10 +136,31 @@ fun TaskEditDialog(
                             placeholder = { Text("Контекст задачи, полезные ссылки...") },
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(85.dp)
+                                .height(75.dp)
                                 .testTag("task_desc_input"),
                             shape = RoundedCornerShape(14.dp)
                         )
+                    }
+
+                    // Energy Cost Selector (1..5)
+                    item {
+                        Text(
+                            text = "Энергозатратность (1 - низкая, 5 - высокая)",
+                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold)
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            (1..5).forEach { level ->
+                                FilterChip(
+                                    selected = energyRequired == level,
+                                    onClick = { energyRequired = level },
+                                    label = { Text("⚡ $level") }
+                                )
+                            }
+                        }
                     }
 
                     // Category Selection
@@ -145,6 +191,34 @@ fun TaskEditDialog(
                                     selected = category == cat,
                                     onClick = { category = cat },
                                     label = { Text(cat, fontSize = 12.sp) }
+                                )
+                            }
+                        }
+                    }
+
+                    // Strict Deadline Toggle
+                    item {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { isStrictDeadline = !isStrictDeadline }
+                        ) {
+                            Switch(
+                                checked = isStrictDeadline,
+                                onCheckedChange = { isStrictDeadline = it }
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column {
+                                Text(
+                                    text = "🚨 Жёсткий дедлайн (Срочный слой)",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 14.sp
+                                )
+                                Text(
+                                    text = "Всегда отображается над уровнями",
+                                    fontSize = 12.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
                         }
@@ -189,12 +263,35 @@ fun TaskEditDialog(
                         }
                     }
 
-                    // Subtasks Checklist
+                    // Subtasks Checklist with AI Decomposition Button
                     item {
-                        Text(
-                            text = "Подзадачи (Чек-лист)",
-                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold)
-                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Подзадачи (Чек-лист)",
+                                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold)
+                            )
+
+                            // AI Decomposition Button
+                            FilledTonalButton(
+                                onClick = {
+                                    if (title.isNotBlank()) {
+                                        val aiSteps = LocalAiEngine.decomposeTask(title)
+                                        subtasks = subtasks + aiSteps.map { SubTask(it, false) }
+                                    }
+                                },
+                                shape = RoundedCornerShape(12.dp),
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
+                            ) {
+                                Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("AI Декомпозиция", fontSize = 12.sp)
+                            }
+                        }
+
                         Spacer(modifier = Modifier.height(6.dp))
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -278,7 +375,7 @@ fun TaskEditDialog(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            listOf(15, 25, 45, 60).forEach { mins ->
+                            listOf(5, 15, 25, 45, 60).forEach { mins ->
                                 FilterChip(
                                     selected = estimatedMinutes == mins,
                                     onClick = { estimatedMinutes = mins },
@@ -336,6 +433,9 @@ fun TaskEditDialog(
                                     description = description.trim(),
                                     category = category,
                                     priority = priority,
+                                    energyRequired = energyRequired,
+                                    fieldWhy = fieldWhy.trim(),
+                                    isStrictDeadline = isStrictDeadline,
                                     recurrence = recurrence,
                                     estimatedMinutes = estimatedMinutes,
                                     inCurrentQuest = inCurrentQuest,
