@@ -102,9 +102,25 @@ fun CalendarStatsScreen(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        MetricCard("Выполнено", "$completedCount / $totalCount", "✅")
-                        MetricCard("Серия", "${userProfile.streakDays} дн. (Рекорд: ${userProfile.bestStreak})", "🔥")
-                        MetricCard("Фокус", "${userProfile.totalFocusMinutes} мин.", "⏳")
+                        MetricCard(
+                            title = "Выполнено",
+                            value = "$completedCount / $totalCount",
+                            emoji = "✅",
+                            modifier = Modifier.weight(1f)
+                        )
+                        MetricCard(
+                            title = "Серия квестов",
+                            value = "${userProfile.streakDays} дн.",
+                            emoji = "🔥",
+                            subtitle = "Рекорд: ${userProfile.bestStreak} дн.",
+                            modifier = Modifier.weight(1f)
+                        )
+                        MetricCard(
+                            title = "Фокус-поток",
+                            value = "${userProfile.totalFocusMinutes} мин.",
+                            emoji = "⏳",
+                            modifier = Modifier.weight(1f)
+                        )
                     }
                 }
             }
@@ -264,12 +280,39 @@ fun CalendarStatsScreen(
 }
 
 @Composable
-fun MetricCard(title: String, value: String, emoji: String) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+fun MetricCard(
+    title: String,
+    value: String,
+    emoji: String,
+    subtitle: String? = null,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = modifier.padding(horizontal = 4.dp)
+    ) {
         Text(emoji, fontSize = 20.sp)
         Spacer(modifier = Modifier.height(2.dp))
-        Text(value, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
-        Text(title, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(
+            text = value,
+            fontWeight = FontWeight.Bold,
+            style = MaterialTheme.typography.bodyMedium,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+        )
+        Text(
+            text = title,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+        )
+        if (subtitle != null) {
+            Text(
+                text = subtitle,
+                fontSize = 9.sp,
+                color = MaterialTheme.colorScheme.primary,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+            )
+        }
     }
 }
 

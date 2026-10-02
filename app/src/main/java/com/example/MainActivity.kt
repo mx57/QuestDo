@@ -69,11 +69,14 @@ class MainActivity : ComponentActivity() {
 
             val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
             val selectedPriority by viewModel.selectedPriorityFilter.collectAsStateWithLifecycle()
+            val urgentTasks by viewModel.urgentTasks.collectAsStateWithLifecycle()
+            val staleTasks by viewModel.staleTasks.collectAsStateWithLifecycle()
 
             var currentTab by remember { mutableStateOf(MainTab.QUEST) }
             var taskToEdit by remember { mutableStateOf<TaskItem?>(null) }
             var showTaskEditDialog by remember { mutableStateOf(false) }
             var showBulkImportDialog by remember { mutableStateOf(false) }
+            var showEveningCheckoutDialog by remember { mutableStateOf(false) }
             var spotlightFocusTask by remember { mutableStateOf<TaskItem?>(null) }
 
             val permissionLauncher = rememberLauncherForActivityResult(
@@ -213,8 +216,9 @@ class MainActivity : ComponentActivity() {
                                 .padding(innerPadding)
                         ) {
                             when (currentTab) {
-                                MainTab.QUEST -> QuestScreen(
+                                 MainTab.QUEST -> QuestScreen(
                                     currentTasks = currentTasks,
+                                    urgentTasks = urgentTasks,
                                     activeLevel = activeLevel,
                                     userProfile = userProfile,
                                     currentQuote = currentQuote,
@@ -232,6 +236,8 @@ class MainActivity : ComponentActivity() {
                                     },
                                     onOpenSOS = { viewModel.openAntiProcrastinationDialog() },
                                     onOpenBreathing = { viewModel.openBreathingExerciseDialog() },
+                                    onOpenEveningCheckout = { showEveningCheckoutDialog = true },
+                                    onSelectEnergy = { viewModel.setEnergyLevel(it) },
                                     onAddNewTask = {
                                         taskToEdit = null
                                         showTaskEditDialog = true
@@ -245,6 +251,7 @@ class MainActivity : ComponentActivity() {
 
                                 MainTab.BACKLOG -> BacklogScreen(
                                     backlogTasks = backlogTasks,
+                                    staleTasks = staleTasks,
                                     completedTasks = completedTasks,
                                     searchQuery = searchQuery,
                                     onSearchQueryChange = { viewModel.searchQuery.value = it },
@@ -255,6 +262,8 @@ class MainActivity : ComponentActivity() {
                                         taskToEdit = it
                                         showTaskEditDialog = true
                                     },
+                                    onDecomposeTask = { viewModel.decomposeTask(it) },
+                                    onStartBossLevel = { title, steps -> viewModel.startBossLevel(title, steps) },
                                     onOpenBulkImport = { showBulkImportDialog = true },
                                     onAddNewTask = {
                                         taskToEdit = null
@@ -280,7 +289,7 @@ class MainActivity : ComponentActivity() {
 
                                 MainTab.CALENDAR -> CalendarStatsScreen(
                                     userProfile = userProfile,
-                                    allTasks = currentTasks + backlogTasks + completedTasks
+                                    allTasks = (currentTasks + backlogTasks + completedTasks).distinctBy { it.id }
                                 )
 
                                 MainTab.SETTINGS -> SettingsScreen(
@@ -352,6 +361,16 @@ class MainActivity : ComponentActivity() {
                         BulkImportDialog(
                             onImport = { text, cat -> viewModel.bulkImportTasks(text, cat) },
                             onDismiss = { showBulkImportDialog = false }
+                        )
+                    }
+
+                    if (showEveningCheckoutDialog) {
+                        EveningCheckoutDialog(
+                            onCompleteCheckout = { reflection ->
+                                viewModel.completeEveningCheckout(reflection)
+                                showEveningCheckoutDialog = false
+                            },
+                            onDismiss = { showEveningCheckoutDialog = false }
                         )
                     }
                 }

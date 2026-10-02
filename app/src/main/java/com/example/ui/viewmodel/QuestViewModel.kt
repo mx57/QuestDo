@@ -79,6 +79,14 @@ class QuestViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList()
     )
 
+    val urgentTasks = repository.urgentDeadlineTasks.stateIn(
+        viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList()
+    )
+
+    val staleTasks = repository.getStaleTasks().stateIn(
+        viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList()
+    )
+
     // UI State for Celebrations and Modals
     private val _showLevelClearDialog = MutableStateFlow(false)
     val showLevelClearDialog: StateFlow<Boolean> = _showLevelClearDialog.asStateFlow()
@@ -249,6 +257,61 @@ class QuestViewModel(application: Application) : AndroidViewModel(application) {
     fun deleteReward(reward: CustomReward) {
         viewModelScope.launch {
             repository.deleteCustomReward(reward)
+        }
+    }
+
+    fun setEnergyLevel(level: Int) {
+        viewModelScope.launch {
+            val updated = userProfile.value.copy(currentEnergyLevel = level.coerceIn(1, 3))
+            repository.updateProfile(updated)
+            triggerHaptic(HapticType.LIGHT)
+        }
+    }
+
+    fun completeEveningCheckout(reflection: String) {
+        viewModelScope.launch {
+            repository.performEveningCheckout(reflection)
+            triggerHaptic(HapticType.VICTORY)
+            if (userProfile.value.soundEffectsEnabled) {
+                soundHelper.playVictoryChime()
+            }
+        }
+    }
+
+    fun decomposeTask(task: TaskItem) {
+        viewModelScope.launch {
+            triggerHaptic(HapticType.MEDIUM)
+            val subtasks = task.getSubtasksList().toMutableList()
+            if (subtasks.isEmpty()) {
+                subtasks.add(SubTask("Шаг 1: Подготовить материалы (2 мин)", false))
+                subtasks.add(SubTask("Шаг 2: Главное действие без отвлечений (10 мин)", false))
+                subtasks.add(SubTask("Шаг 3: Проверить и зафиксировать результат (3 мин)", false))
+            } else {
+                subtasks.add(SubTask("Микро-шаг: Финальное завершение (5 мин)", false))
+            }
+            val updated = task.copy(subtasksRaw = TaskItem.serializeSubtasks(subtasks))
+            repository.updateTask(updated)
+        }
+    }
+
+    fun startBossLevel(title: String, steps: List<String>) {
+        viewModelScope.launch {
+            triggerHaptic(HapticType.VICTORY)
+            val subtasks = steps.map { SubTask(it, false) }
+            val bossTask = TaskItem(
+                title = "🐉 БОСС: $title",
+                description = "Эпическая цель разбита на этапы. Победите босса шаг за шагом!",
+                category = "Босс",
+                priority = Priority.CRITICAL,
+                energyRequired = 3,
+                inCurrentQuest = true,
+                subtasksRaw = TaskItem.serializeSubtasks(subtasks),
+                estimatedMinutes = (steps.size * 15).coerceAtLeast(25)
+            )
+            val id = repository.insertTask(bossTask)
+            if (bossTask.dueDate != null) {
+                QuestAlarmScheduler.scheduleTaskAlarm(getApplication(), bossTask.copy(id = id))
+            }
         }
     }
 

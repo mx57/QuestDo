@@ -215,28 +215,45 @@ fun RewardsScreen(
                                 )
                             }
 
-                            Button(
-                                onClick = {
-                                    onRedeemReward(reward) { success ->
-                                        snackbarMessage = if (success) {
-                                            "🎉 Награда «${reward.title}» активирована! Наслаждайтесь!"
-                                        } else {
-                                            "Недостаточно монет! Закройте еще один микро-квест."
-                                        }
-                                    }
-                                },
-                                enabled = canAfford,
-                                shape = RoundedCornerShape(12.dp),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = GoldAccent,
-                                    disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant
-                                )
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
                             ) {
-                                Text(
-                                    text = "${reward.costCoins} 🪙",
-                                    color = if (canAfford) Color.Black else MaterialTheme.colorScheme.onSurfaceVariant,
-                                    fontWeight = FontWeight.Bold
-                                )
+                                Button(
+                                    onClick = {
+                                        onRedeemReward(reward) { success ->
+                                            snackbarMessage = if (success) {
+                                                "🎉 Награда «${reward.title}» активирована! Наслаждайтесь!"
+                                            } else {
+                                                "Недостаточно монет! Закройте еще один микро-квест."
+                                            }
+                                        }
+                                    },
+                                    enabled = canAfford,
+                                    shape = RoundedCornerShape(12.dp),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = GoldAccent,
+                                        disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant
+                                    )
+                                ) {
+                                    Text(
+                                        text = "${reward.costCoins} 🪙",
+                                        color = if (canAfford) Color.Black else MaterialTheme.colorScheme.onSurfaceVariant,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+
+                                IconButton(
+                                    onClick = { onDeleteReward(reward) },
+                                    modifier = Modifier.size(36.dp)
+                                ) {
+                                    Icon(
+                                        Icons.Default.DeleteOutline,
+                                        contentDescription = "Удалить награду",
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
                             }
                         }
                     }
@@ -365,10 +382,24 @@ fun AddCustomRewardDialog(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 4.dp),
+                        .padding(vertical = 2.dp),
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     emojis.take(5).forEach { em ->
+                        FilterChip(
+                            selected = iconEmoji == em,
+                            onClick = { iconEmoji = em },
+                            label = { Text(em, fontSize = 16.sp) }
+                        )
+                    }
+                }
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 2.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    emojis.drop(5).forEach { em ->
                         FilterChip(
                             selected = iconEmoji == em,
                             onClick = { iconEmoji = em },

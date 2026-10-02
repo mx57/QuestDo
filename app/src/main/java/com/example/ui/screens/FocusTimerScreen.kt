@@ -5,8 +5,12 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -139,10 +143,11 @@ fun FocusTimerScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .verticalScroll(rememberScrollState())
             .padding(horizontal = 20.dp, vertical = 12.dp)
             .testTag("focus_timer_screen"),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.SpaceBetween
+        verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         // Spotlight Task Selector Card
         Card(
@@ -244,7 +249,7 @@ fun FocusTimerScreen(
             modifier = Modifier.fillMaxWidth()
         ) {
             Column(
-                modifier = Modifier.padding(12.dp),
+                modifier = Modifier.padding(14.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Row(
@@ -255,7 +260,7 @@ fun FocusTimerScreen(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         IconButton(
                             onClick = { isMuted = !isMuted },
-                            modifier = Modifier.size(32.dp)
+                            modifier = Modifier.size(40.dp)
                         ) {
                             Icon(
                                 if (isMuted) Icons.Default.VolumeOff else Icons.Default.VolumeUp,
@@ -289,24 +294,17 @@ fun FocusTimerScreen(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(6.dp))
+                Spacer(modifier = Modifier.height(8.dp))
 
-                Row(
+                LazyRow(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    soundOptions.take(3).forEach { snd ->
+                    items(soundOptions) { snd ->
                         FilterChip(
                             selected = activeSound == snd,
                             onClick = { activeSound = snd },
-                            label = { Text(snd, fontSize = 10.sp) }
-                        )
-                    }
-                    soundOptions.drop(3).forEach { snd ->
-                        FilterChip(
-                            selected = activeSound == snd,
-                            onClick = { activeSound = snd },
-                            label = { Text(snd, fontSize = 10.sp) }
+                            label = { Text(snd, fontSize = 11.sp) }
                         )
                     }
                 }
@@ -336,9 +334,9 @@ fun FocusTimerScreen(
                                     timeLeftSeconds = totalTimeMinutes * 60
                                 }
                             },
-                            modifier = Modifier.size(32.dp)
+                            modifier = Modifier.size(36.dp)
                         ) {
-                            Text("-5", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            Text("-5", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                         }
                         Spacer(modifier = Modifier.width(6.dp))
                         FilledTonalIconButton(
@@ -348,27 +346,27 @@ fun FocusTimerScreen(
                                     timeLeftSeconds = totalTimeMinutes * 60
                                 }
                             },
-                            modifier = Modifier.size(32.dp)
+                            modifier = Modifier.size(36.dp)
                         ) {
-                            Text("+5", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            Text("+5", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                         }
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(6.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
-            Row(
+            LazyRow(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                listOf(
+                items(listOf(
                     Pair(5, "5м ☕"),
                     Pair(15, "15м 🌿"),
                     Pair(25, "25м 🍅"),
                     Pair(45, "45м 🚀"),
                     Pair(60, "60м ⚔️")
-                ).forEach { (mins, label) ->
+                )) { (mins, label) ->
                     FilterChip(
                         selected = totalTimeMinutes == mins,
                         onClick = {
@@ -377,8 +375,7 @@ fun FocusTimerScreen(
                                 timeLeftSeconds = mins * 60
                             }
                         },
-                        label = { Text(label, fontSize = 11.sp) },
-                        modifier = Modifier.weight(1f)
+                        label = { Text(label, fontSize = 12.sp) }
                     )
                 }
             }
@@ -388,7 +385,7 @@ fun FocusTimerScreen(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(bottom = 72.dp),
+                .padding(bottom = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(14.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
