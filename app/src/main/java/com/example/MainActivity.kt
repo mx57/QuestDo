@@ -13,6 +13,7 @@ import androidx.activity.viewModels
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -120,12 +121,17 @@ class MainActivity : ComponentActivity() {
                                     }
                                 },
                                 actions = {
-                                    // Mood indicator button
+                                    // Interactive Mood switcher pill
                                     Surface(
                                         shape = RoundedCornerShape(12.dp),
                                         color = MaterialTheme.colorScheme.primaryContainer,
                                         modifier = Modifier
                                             .padding(end = 8.dp)
+                                            .clickable {
+                                                val allMoods = com.example.data.model.MoodType.values()
+                                                val nextIndex = (userProfile.activeMood.ordinal + 1) % allMoods.size
+                                                viewModel.setMood(allMoods[nextIndex])
+                                            }
                                     ) {
                                         Text(
                                             text = "${userProfile.activeMood.iconEmoji} ${userProfile.activeMood.titleRu}",

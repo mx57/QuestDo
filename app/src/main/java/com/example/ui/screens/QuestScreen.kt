@@ -302,7 +302,7 @@ fun HeroHeaderCard(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    // Streak Badge (with Freeze icon if active)
+                    // Streak Badge
                     Surface(
                         shape = RoundedCornerShape(12.dp),
                         color = StreakFire.copy(alpha = 0.15f)
@@ -312,14 +312,21 @@ fun HeroHeaderCard(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text("🔥", fontSize = 14.sp)
-                            Spacer(modifier = Modifier.width(4.dp))
+                            Spacer(modifier = Modifier.width(3.dp))
                             Text(
-                                text = "${userProfile.streakDays} дн. (❄️${userProfile.streakFreezes})",
+                                text = "${userProfile.streakDays}",
                                 style = MaterialTheme.typography.labelMedium.copy(
                                     fontWeight = FontWeight.Bold,
                                     color = StreakFire
                                 )
                             )
+                            if (userProfile.streakFreezes > 0) {
+                                Spacer(modifier = Modifier.width(3.dp))
+                                Text(
+                                    text = "❄️${userProfile.streakFreezes}",
+                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Normal)
+                                )
+                            }
                         }
                     }
 
@@ -333,7 +340,7 @@ fun HeroHeaderCard(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text("🪙", fontSize = 14.sp)
-                            Spacer(modifier = Modifier.width(4.dp))
+                            Spacer(modifier = Modifier.width(3.dp))
                             Text(
                                 text = "${userProfile.coins}",
                                 style = MaterialTheme.typography.labelMedium.copy(
@@ -377,6 +384,58 @@ fun HeroHeaderCard(
                 color = XpPurple,
                 trackColor = MaterialTheme.colorScheme.surfaceVariant
             )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Quick Ritual Actions Row
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f),
+                    modifier = Modifier
+                        .weight(1f)
+                        .clickable { onOpenBreathing() }
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Text("🌿", fontSize = 14.sp)
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "Дыхание 4-7-8",
+                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.onSecondaryContainer
+                        )
+                    }
+                }
+
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.5f),
+                    modifier = Modifier
+                        .weight(1f)
+                        .clickable { onOpenEveningCheckout() }
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Text("🌙", fontSize = 14.sp)
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "Чек-аут дня",
+                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.onTertiaryContainer
+                        )
+                    }
+                }
+            }
         }
     }
 }
@@ -521,6 +580,7 @@ fun QuestStatusBanner(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun QuestTaskCard(
     task: TaskItem,
@@ -579,10 +639,11 @@ fun QuestTaskCard(
                         .weight(1f)
                         .clickable { onEdit() }
                 ) {
-                    // Category & Priority Row
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    // Category & Priority Badges (responsive flow layout)
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                        modifier = Modifier.fillMaxWidth()
                     ) {
                         Surface(
                             shape = RoundedCornerShape(6.dp),

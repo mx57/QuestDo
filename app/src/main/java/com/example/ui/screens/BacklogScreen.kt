@@ -4,6 +4,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -101,30 +102,38 @@ fun BacklogScreen(
             Spacer(modifier = Modifier.height(10.dp))
 
             // Eisenhower matrix priority filter chips
-            Row(
+            LazyRow(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                FilterChip(
-                    selected = selectedPriority == null,
-                    onClick = { onSelectPriority(null) },
-                    label = { Text("Все", fontSize = 11.sp) }
-                )
-                FilterChip(
-                    selected = selectedPriority == Priority.CRITICAL,
-                    onClick = { onSelectPriority(if (selectedPriority == Priority.CRITICAL) null else Priority.CRITICAL) },
-                    label = { Text("Q1 Срочно", fontSize = 11.sp) }
-                )
-                FilterChip(
-                    selected = selectedPriority == Priority.HIGH,
-                    onClick = { onSelectPriority(if (selectedPriority == Priority.HIGH) null else Priority.HIGH) },
-                    label = { Text("Q2 Важно", fontSize = 11.sp) }
-                )
-                FilterChip(
-                    selected = selectedPriority == Priority.MEDIUM,
-                    onClick = { onSelectPriority(if (selectedPriority == Priority.MEDIUM) null else Priority.MEDIUM) },
-                    label = { Text("Q3 Делегир.", fontSize = 11.sp) }
-                )
+                item {
+                    FilterChip(
+                        selected = selectedPriority == null,
+                        onClick = { onSelectPriority(null) },
+                        label = { Text("Все", fontSize = 12.sp) }
+                    )
+                }
+                item {
+                    FilterChip(
+                        selected = selectedPriority == Priority.CRITICAL,
+                        onClick = { onSelectPriority(if (selectedPriority == Priority.CRITICAL) null else Priority.CRITICAL) },
+                        label = { Text("Q1 Срочно", fontSize = 12.sp) }
+                    )
+                }
+                item {
+                    FilterChip(
+                        selected = selectedPriority == Priority.HIGH,
+                        onClick = { onSelectPriority(if (selectedPriority == Priority.HIGH) null else Priority.HIGH) },
+                        label = { Text("Q2 Важно", fontSize = 12.sp) }
+                    )
+                }
+                item {
+                    FilterChip(
+                        selected = selectedPriority == Priority.MEDIUM,
+                        onClick = { onSelectPriority(if (selectedPriority == Priority.MEDIUM) null else Priority.MEDIUM) },
+                        label = { Text("Q3 Делегир.", fontSize = 12.sp) }
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(6.dp))
@@ -245,6 +254,7 @@ fun BacklogScreen(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun BacklogItemCard(
     task: TaskItem,
@@ -282,32 +292,33 @@ fun BacklogItemCard(
             Spacer(modifier = Modifier.width(8.dp))
 
             Column(modifier = Modifier.weight(1f)) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                    modifier = Modifier.fillMaxWidth()
                 ) {
                     Surface(
-                        shape = RoundedCornerShape(4.dp),
-                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
+                        shape = RoundedCornerShape(6.dp),
+                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
                     ) {
                         Text(
                             text = task.category,
-                            style = MaterialTheme.typography.labelSmall,
+                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Medium),
                             color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                         )
                     }
 
                     if (task.inCurrentQuest) {
                         Surface(
-                            shape = RoundedCornerShape(4.dp),
+                            shape = RoundedCornerShape(6.dp),
                             color = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.2f)
                         ) {
                             Text(
                                 text = "В Квесте",
                                 style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
                                 color = MaterialTheme.colorScheme.tertiary,
-                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                             )
                         }
                     }
@@ -315,14 +326,14 @@ fun BacklogItemCard(
                     if (task.dueDate != null) {
                         val isOverdue = !task.isCompleted && task.dueDate < System.currentTimeMillis()
                         Surface(
-                            shape = RoundedCornerShape(4.dp),
+                            shape = RoundedCornerShape(6.dp),
                             color = if (isOverdue) MaterialTheme.colorScheme.error.copy(alpha = 0.15f) else MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.4f)
                         ) {
                             Text(
                                 text = if (isOverdue) "⚠️ Просрочено" else "⏰ Напоминание",
                                 style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
                                 color = if (isOverdue) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSecondaryContainer,
-                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                             )
                         }
                     }
