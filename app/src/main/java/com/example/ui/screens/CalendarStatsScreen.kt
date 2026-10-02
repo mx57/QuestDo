@@ -56,6 +56,22 @@ fun CalendarStatsScreen(
 
     val selectedDay = daysList.find { it.offsetDays == selectedDateOffsetDays } ?: daysList[3]
 
+    val dayTasks = remember(allTasks, selectedDay.fullDate, selectedDateOffsetDays) {
+        val matchingDueTasks = allTasks.filter { task ->
+            task.dueDate?.let { due ->
+                val dueStr = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date(due))
+                dueStr == selectedDay.fullDate
+            } ?: false
+        }
+        if (matchingDueTasks.isNotEmpty()) {
+            matchingDueTasks
+        } else if (selectedDateOffsetDays == 0) {
+            allTasks.filter { it.inCurrentQuest || !it.isCompleted }
+        } else {
+            allTasks.filter { !it.isCompleted }.take(3)
+        }
+    }
+
     val completedCount = allTasks.count { it.isCompleted }
     val totalCount = allTasks.size
 
@@ -195,12 +211,6 @@ fun CalendarStatsScreen(
             )
         }
 
-        val dayTasks = if (selectedDateOffsetDays == 0) {
-            allTasks.filter { it.inCurrentQuest || !it.isCompleted }
-        } else {
-            allTasks.filter { !it.isCompleted }.take(3)
-        }
-
         if (dayTasks.isEmpty()) {
             item {
                 Surface(
@@ -236,8 +246,12 @@ fun CalendarStatsScreen(
                                 text = task.title,
                                 style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold)
                             )
+                            val reminderText = if (task.dueDate != null) {
+                                val timeFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
+                                " • ⏰ ${timeFormat.format(Date(task.dueDate))}"
+                            } else ""
                             Text(
-                                text = "${task.category} • ${task.estimatedMinutes} мин",
+                                text = "${task.category} • ${task.estimatedMinutes} мин$reminderText",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )

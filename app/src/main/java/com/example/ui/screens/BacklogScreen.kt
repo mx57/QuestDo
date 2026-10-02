@@ -311,6 +311,21 @@ fun BacklogItemCard(
                             )
                         }
                     }
+
+                    if (task.dueDate != null) {
+                        val isOverdue = !task.isCompleted && task.dueDate < System.currentTimeMillis()
+                        Surface(
+                            shape = RoundedCornerShape(4.dp),
+                            color = if (isOverdue) MaterialTheme.colorScheme.error.copy(alpha = 0.15f) else MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.4f)
+                        ) {
+                            Text(
+                                text = if (isOverdue) "⚠️ Просрочено" else "⏰ Напоминание",
+                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                color = if (isOverdue) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSecondaryContainer,
+                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                            )
+                        }
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(3.dp))

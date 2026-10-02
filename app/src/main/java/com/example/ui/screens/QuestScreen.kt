@@ -621,6 +621,26 @@ fun QuestTaskCard(
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
+
+                        if (task.dueDate != null) {
+                            val isOverdue = !task.isCompleted && task.dueDate < System.currentTimeMillis()
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = if (isOverdue) MaterialTheme.colorScheme.error.copy(alpha = 0.15f) else GoldAccent.copy(alpha = 0.2f)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(if (isOverdue) "⚠️ " else "⏰ ", fontSize = 10.sp)
+                                    Text(
+                                        text = formatCardDueDate(task.dueDate),
+                                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                        color = if (isOverdue) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
+                            }
+                        }
                     }
 
                     Spacer(modifier = Modifier.height(6.dp))
@@ -805,3 +825,21 @@ fun EmptyQuestPlaceholder(
         }
     }
 }
+
+fun formatCardDueDate(timestamp: Long): String {
+    val cal = java.util.Calendar.getInstance().apply { timeInMillis = timestamp }
+    val today = java.util.Calendar.getInstance()
+    val isToday = cal.get(java.util.Calendar.YEAR) == today.get(java.util.Calendar.YEAR) &&
+            cal.get(java.util.Calendar.DAY_OF_YEAR) == today.get(java.util.Calendar.DAY_OF_YEAR)
+    val tomorrow = java.util.Calendar.getInstance().apply { add(java.util.Calendar.DAY_OF_YEAR, 1) }
+    val isTomorrow = cal.get(java.util.Calendar.YEAR) == tomorrow.get(java.util.Calendar.YEAR) &&
+            cal.get(java.util.Calendar.DAY_OF_YEAR) == tomorrow.get(java.util.Calendar.DAY_OF_YEAR)
+
+    val timeFormat = java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault())
+    return when {
+        isToday -> "Сегодня ${timeFormat.format(cal.time)}"
+        isTomorrow -> "Завтра ${timeFormat.format(cal.time)}"
+        else -> java.text.SimpleDateFormat("d MMM HH:mm", java.util.Locale("ru")).format(cal.time)
+    }
+}
+

@@ -11,16 +11,18 @@ import androidx.lifecycle.viewModelScope
 import com.example.data.db.AppDatabase
 import com.example.data.model.*
 import com.example.data.repository.QuestRepository
-import com.example.util.DataExportImportEngine
-import com.example.util.LocalAiEngine
-import com.example.util.LocalNlpParser
+import com.example.util.NotificationHelper
+import com.example.util.QuestAlarmScheduler
+import com.example.util.SoundEffectsHelper
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import java.util.Calendar
 
 class QuestViewModel(application: Application) : AndroidViewModel(application) {
 
     private val repository: QuestRepository
     private val vibrator: Vibrator?
+    val soundHelper: SoundEffectsHelper
 
     init {
         val db = AppDatabase.getInstance(application)
@@ -31,6 +33,8 @@ class QuestViewModel(application: Application) : AndroidViewModel(application) {
             customRewardDao = db.customRewardDao(),
             badgeDao = db.badgeDao()
         )
+        soundHelper = SoundEffectsHelper(application)
+        NotificationHelper.createNotificationChannels(application)
 
         vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             val vibratorManager = application.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager
@@ -43,6 +47,7 @@ class QuestViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             repository.initializeDefaultsIfNeeded()
             refreshQuote()
+            QuestAlarmScheduler.scheduleDailyReminder(application, 9, 0)
         }
     }
 
@@ -51,14 +56,6 @@ class QuestViewModel(application: Application) : AndroidViewModel(application) {
     )
 
     val backlogTasks = repository.backlogTasks.stateIn(
-        viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList()
-    )
-
-    val urgentDeadlineTasks = repository.urgentDeadlineTasks.stateIn(
-        viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList()
-    )
-
-    val staleTasks = repository.getStaleTasks(90).stateIn(
         viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList()
     )
 
@@ -98,9 +95,6 @@ class QuestViewModel(application: Application) : AndroidViewModel(application) {
     private val _showBreathingExerciseDialog = MutableStateFlow(false)
     val showBreathingExerciseDialog: StateFlow<Boolean> = _showBreathingExerciseDialog.asStateFlow()
 
-    private val _showEveningCheckoutDialog = MutableStateFlow(false)
-    val showEveningCheckoutDialog: StateFlow<Boolean> = _showEveningCheckoutDialog.asStateFlow()
-
     private val _currentQuote = MutableStateFlow(
         MotivationalEngine.getContextualQuote(MoodType.FOCUS)
     )
@@ -117,17 +111,53 @@ class QuestViewModel(application: Application) : AndroidViewModel(application) {
     fun toggleTask(task: TaskItem) {
         viewModelScope.launch {
             triggerHaptic(HapticType.LIGHT)
+            if (!task.isCompleted) {
+                QuestAlarmScheduler.cancelTaskAlarm(getApplication(), task.id)
+            }
             val allCleared = repository.toggleTaskCompleted(task)
+
+            // Recurrence support: if task was completed and has recurrence, schedule next occurrence
+            if (!task.isCompleted && task.recurrence != RecurrenceRule.NONE && task.dueDate != null) {
+                val nextDue = calculateNextDueDate(task.dueDate, task.recurrence)
+                val recurringTask = task.copy(
+                    id = 0,
+                    isCompleted = false,
+                    completedAt = null,
+                    dueDate = nextDue,
+                    createdAt = System.currentTimeMillis()
+                )
+                val newId = repository.insertTask(recurringTask)
+                QuestAlarmScheduler.scheduleTaskAlarm(getApplication(), recurringTask.copy(id = newId))
+            }
+
             if (allCleared) {
                 val currentLevel = activeLevel.value
                 if (currentLevel != null && !currentLevel.isCompleted) {
                     triggerHaptic(HapticType.VICTORY)
+                    if (userProfile.value.soundEffectsEnabled) {
+                        soundHelper.playVictoryChime()
+                    }
                     _clearedLevel.value = currentLevel
                     _showConfetti.value = true
                     _showLevelClearDialog.value = true
                 }
             }
         }
+    }
+
+    private fun calculateNextDueDate(currentDueDate: Long, recurrence: RecurrenceRule): Long {
+        val cal = Calendar.getInstance().apply { timeInMillis = currentDueDate }
+        when (recurrence) {
+            RecurrenceRule.DAILY -> cal.add(Calendar.DAY_OF_YEAR, 1)
+            RecurrenceRule.WEEKDAYS -> {
+                do {
+                    cal.add(Calendar.DAY_OF_YEAR, 1)
+                } while (cal.get(Calendar.DAY_OF_WEEK) == Calendar.SATURDAY || cal.get(Calendar.DAY_OF_WEEK) == Calendar.SUNDAY)
+            }
+            RecurrenceRule.WEEKLY -> cal.add(Calendar.WEEK_OF_YEAR, 1)
+            RecurrenceRule.NONE -> {}
+        }
+        return cal.timeInMillis
     }
 
     fun claimLevelReward(chosenReward: String) {
@@ -147,68 +177,6 @@ class QuestViewModel(application: Application) : AndroidViewModel(application) {
         _showConfetti.value = false
         viewModelScope.launch {
             repository.startNextQuest()
-        }
-    }
-
-    fun setEnergyLevel(energy: Int) {
-        viewModelScope.launch {
-            val updated = userProfile.value.copy(currentEnergyLevel = energy.coerceIn(1, 3))
-            repository.updateProfile(updated)
-        }
-    }
-
-    fun completeOnboarding(tasksPerQuest: Int) {
-        viewModelScope.launch {
-            val updated = userProfile.value.copy(
-                hasCompletedOnboarding = true,
-                tasksPerQuest = tasksPerQuest.coerceIn(1, 5)
-            )
-            repository.updateProfile(updated)
-        }
-    }
-
-    fun addNlpTask(rawInput: String) {
-        viewModelScope.launch {
-            val parsed = LocalNlpParser.parseInput(rawInput)
-            val newTask = TaskItem(
-                title = parsed.title,
-                priority = parsed.priority,
-                dueDate = parsed.dueDate,
-                isStrictDeadline = parsed.isStrictDeadline
-            )
-            repository.insertTask(newTask)
-        }
-    }
-
-    fun decomposeTaskWithAi(task: TaskItem) {
-        viewModelScope.launch {
-            val steps = LocalAiEngine.decomposeTask(task.title)
-            val existing = task.getSubtasksList()
-            val newSubtasks = steps.map { SubTask(it, false) }
-            val combined = TaskItem.serializeSubtasks(existing + newSubtasks)
-            repository.updateTask(task.copy(subtasksRaw = combined))
-        }
-    }
-
-    fun startBossLevel(goalTitle: String, steps: List<String>) {
-        viewModelScope.launch {
-            repository.startBossLevel(goalTitle, steps)
-        }
-    }
-
-    fun openEveningCheckout() {
-        _showEveningCheckoutDialog.value = true
-    }
-
-    fun closeEveningCheckout() {
-        _showEveningCheckoutDialog.value = false
-    }
-
-    fun performEveningCheckout(reflection: String) {
-        viewModelScope.launch {
-            triggerHaptic(HapticType.VICTORY)
-            repository.performEveningCheckout(reflection)
-            _showEveningCheckoutDialog.value = false
         }
     }
 
@@ -234,16 +202,24 @@ class QuestViewModel(application: Application) : AndroidViewModel(application) {
 
     fun saveTask(task: TaskItem) {
         viewModelScope.launch {
-            if (task.id == 0L) {
+            val savedId = if (task.id == 0L) {
                 repository.insertTask(task)
             } else {
                 repository.updateTask(task)
+                task.id
+            }
+            val taskWithId = task.copy(id = savedId)
+            if (taskWithId.dueDate != null && !taskWithId.isCompleted) {
+                QuestAlarmScheduler.scheduleTaskAlarm(getApplication(), taskWithId)
+            } else {
+                QuestAlarmScheduler.cancelTaskAlarm(getApplication(), savedId)
             }
         }
     }
 
     fun deleteTask(task: TaskItem) {
         viewModelScope.launch {
+            QuestAlarmScheduler.cancelTaskAlarm(getApplication(), task.id)
             repository.deleteTask(task)
         }
     }
@@ -251,32 +227,6 @@ class QuestViewModel(application: Application) : AndroidViewModel(application) {
     fun bulkImportTasks(linesText: String, category: String = "Импорт") {
         viewModelScope.launch {
             repository.bulkImportTasks(linesText, category)
-        }
-    }
-
-    fun exportToJson(): String {
-        return DataExportImportEngine.exportToJson(userProfile.value, currentQuestTasks.value + backlogTasks.value)
-    }
-
-    fun exportToCsv(): String {
-        return DataExportImportEngine.exportToCsv(currentQuestTasks.value + backlogTasks.value)
-    }
-
-    fun importFromJson(jsonStr: String) {
-        viewModelScope.launch {
-            val tasks = DataExportImportEngine.parseJsonTasks(jsonStr)
-            for (t in tasks) {
-                repository.insertTask(t)
-            }
-        }
-    }
-
-    fun importFromCsv(csvStr: String) {
-        viewModelScope.launch {
-            val tasks = DataExportImportEngine.parseCsvTasks(csvStr)
-            for (t in tasks) {
-                repository.insertTask(t)
-            }
         }
     }
 
@@ -324,13 +274,6 @@ class QuestViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun toggleShowHorizon(show: Boolean) {
-        viewModelScope.launch {
-            val updated = userProfile.value.copy(showHorizon = show)
-            repository.updateProfile(updated)
-        }
-    }
-
     fun setAppIconStyle(style: AppIconStyle) {
         viewModelScope.launch {
             val updated = userProfile.value.copy(appIconStyle = style)
@@ -343,6 +286,47 @@ class QuestViewModel(application: Application) : AndroidViewModel(application) {
             val updated = userProfile.value.copy(notificationTone = tone)
             repository.updateProfile(updated)
         }
+    }
+
+    fun setSoundEffectsEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            val updated = userProfile.value.copy(soundEffectsEnabled = enabled)
+            repository.updateProfile(updated)
+        }
+    }
+
+    fun setHapticsEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            val updated = userProfile.value.copy(hapticsEnabled = enabled)
+            repository.updateProfile(updated)
+        }
+    }
+
+    fun setNotificationsEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            val updated = userProfile.value.copy(notificationsEnabled = enabled)
+            repository.updateProfile(updated)
+        }
+    }
+
+    fun setDailyReminderTime(hour: Int, minute: Int) {
+        viewModelScope.launch {
+            val updated = userProfile.value.copy(dailyReminderHour = hour, dailyReminderMinute = minute)
+            repository.updateProfile(updated)
+            QuestAlarmScheduler.scheduleDailyReminder(getApplication(), hour, minute)
+        }
+    }
+
+    fun triggerTestNotification() {
+        NotificationHelper.showTestNotification(getApplication())
+        if (userProfile.value.soundEffectsEnabled) {
+            soundHelper.playAlarmAlert()
+        }
+        triggerHaptic(HapticType.VICTORY)
+    }
+
+    fun triggerTestAlarm(delaySeconds: Int = 10) {
+        QuestAlarmScheduler.scheduleTestAlarm(getApplication(), delaySeconds)
     }
 
     fun logFocusSession(minutes: Int) {
@@ -371,7 +355,7 @@ class QuestViewModel(application: Application) : AndroidViewModel(application) {
     private fun triggerHaptic(type: HapticType) {
         if (!userProfile.value.hapticsEnabled) return
         try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 val effect = when (type) {
                     HapticType.LIGHT -> VibrationEffect.createOneShot(35, VibrationEffect.DEFAULT_AMPLITUDE)
                     HapticType.MEDIUM -> VibrationEffect.createOneShot(70, VibrationEffect.DEFAULT_AMPLITUDE)

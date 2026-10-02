@@ -32,6 +32,9 @@ data class UserProfile(
     val notificationTone: NotificationTone = NotificationTone.CARING,
     val soundEffectsEnabled: Boolean = true,
     val hapticsEnabled: Boolean = true,
+    val notificationsEnabled: Boolean = true,
+    val dailyReminderHour: Int = 9,
+    val dailyReminderMinute: Int = 0,
     val totalQuestsCompleted: Int = 0,
     val totalTasksCompleted: Int = 0,
     val totalFocusMinutes: Int = 0

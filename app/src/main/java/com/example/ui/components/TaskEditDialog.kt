@@ -1,19 +1,18 @@
 package com.example.ui.components
 
+import android.app.TimePickerDialog
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.AutoAwesome
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -24,8 +23,9 @@ import com.example.data.model.Priority
 import com.example.data.model.RecurrenceRule
 import com.example.data.model.SubTask
 import com.example.data.model.TaskItem
-import com.example.util.LocalAiEngine
-import com.example.util.LocalNlpParser
+import com.example.ui.theme.GoldAccent
+import java.text.SimpleDateFormat
+import java.util.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -35,21 +35,23 @@ fun TaskEditDialog(
     onDeleteTask: ((TaskItem) -> Unit)? = null,
     onDismiss: () -> Unit
 ) {
+    val context = LocalContext.current
+
     var title by remember { mutableStateOf(initialTask?.title ?: "") }
     var description by remember { mutableStateOf(initialTask?.description ?: "") }
     var category by remember { mutableStateOf(initialTask?.category ?: "Работа") }
     var priority by remember { mutableStateOf(initialTask?.priority ?: Priority.HIGH) }
-    var energyRequired by remember { mutableIntStateOf(initialTask?.energyRequired ?: 2) }
-    var fieldWhy by remember { mutableStateOf(initialTask?.fieldWhy ?: "") }
-    var isStrictDeadline by remember { mutableStateOf(initialTask?.isStrictDeadline ?: false) }
     var recurrence by remember { mutableStateOf(initialTask?.recurrence ?: RecurrenceRule.NONE) }
     var estimatedMinutes by remember { mutableIntStateOf(initialTask?.estimatedMinutes ?: 25) }
     var inCurrentQuest by remember { mutableStateOf(initialTask?.inCurrentQuest ?: false) }
+    var dueDate by remember { mutableStateOf<Long?>(initialTask?.dueDate) }
 
     var subtasks by remember {
         mutableStateOf(initialTask?.getSubtasksList() ?: emptyList())
     }
     var newSubtaskText by remember { mutableStateOf("") }
+
+    var showDatePicker by remember { mutableStateOf(false) }
 
     val categories = listOf("Работа", "Учеба", "Здоровье", "Дом", "Развитие", "Финансы")
 
@@ -86,42 +88,22 @@ fun TaskEditDialog(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(10.dp))
 
                 LazyColumn(
                     modifier = Modifier.weight(1f),
                     verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
-                    // Title field with NLP auto-parse feature
+                    // Title field
                     item {
                         OutlinedTextField(
                             value = title,
-                            onValueChange = { input ->
-                                title = input
-                                if (initialTask == null && (input.contains("завтра") || input.startsWith("!"))) {
-                                    val parsed = LocalNlpParser.parseInput(input)
-                                    priority = parsed.priority
-                                    isStrictDeadline = parsed.isStrictDeadline
-                                }
-                            },
-                            label = { Text("Название задачи / NLP ввода *") },
-                            placeholder = { Text("Например: !срочно позвонить маме завтра") },
+                            onValueChange = { title = it },
+                            label = { Text("Название задачи / шага *") },
+                            placeholder = { Text("Например: Написать 1 главу статьи") },
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .testTag("task_title_input"),
-                            singleLine = true,
-                            shape = RoundedCornerShape(14.dp)
-                        )
-                    }
-
-                    // Field "Why" («Зачем» / «Мостик к цели»)
-                    item {
-                        OutlinedTextField(
-                            value = fieldWhy,
-                            onValueChange = { fieldWhy = it },
-                            label = { Text("«Зачем» — Мостик к высшей цели 🎯") },
-                            placeholder = { Text("Почему это важно сделать? (покажется при попытке отложить)") },
-                            modifier = Modifier.fillMaxWidth(),
                             singleLine = true,
                             shape = RoundedCornerShape(14.dp)
                         )
@@ -136,31 +118,10 @@ fun TaskEditDialog(
                             placeholder = { Text("Контекст задачи, полезные ссылки...") },
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(75.dp)
+                                .height(85.dp)
                                 .testTag("task_desc_input"),
                             shape = RoundedCornerShape(14.dp)
                         )
-                    }
-
-                    // Energy Cost Selector (1..5)
-                    item {
-                        Text(
-                            text = "Энергозатратность (1 - низкая, 5 - высокая)",
-                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold)
-                        )
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            (1..5).forEach { level ->
-                                FilterChip(
-                                    selected = energyRequired == level,
-                                    onClick = { energyRequired = level },
-                                    label = { Text("⚡ $level") }
-                                )
-                            }
-                        }
                     }
 
                     // Category Selection
@@ -191,34 +152,6 @@ fun TaskEditDialog(
                                     selected = category == cat,
                                     onClick = { category = cat },
                                     label = { Text(cat, fontSize = 12.sp) }
-                                )
-                            }
-                        }
-                    }
-
-                    // Strict Deadline Toggle
-                    item {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable { isStrictDeadline = !isStrictDeadline }
-                        ) {
-                            Switch(
-                                checked = isStrictDeadline,
-                                onCheckedChange = { isStrictDeadline = it }
-                            )
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Column {
-                                Text(
-                                    text = "🚨 Жёсткий дедлайн (Срочный слой)",
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 14.sp
-                                )
-                                Text(
-                                    text = "Всегда отображается над уровнями",
-                                    fontSize = 12.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
                         }
@@ -263,35 +196,180 @@ fun TaskEditDialog(
                         }
                     }
 
-                    // Subtasks Checklist with AI Decomposition Button
+                    // SECTION: Alarm & Reminder Settings
                     item {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
+                        Card(
+                            shape = RoundedCornerShape(16.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = if (dueDate != null) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+                            ),
+                            modifier = Modifier.fillMaxWidth()
                         ) {
-                            Text(
-                                text = "Подзадачи (Чек-лист)",
-                                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold)
-                            )
-
-                            // AI Decomposition Button
-                            FilledTonalButton(
-                                onClick = {
-                                    if (title.isNotBlank()) {
-                                        val aiSteps = LocalAiEngine.decomposeTask(title)
-                                        subtasks = subtasks + aiSteps.map { SubTask(it, false) }
+                            Column(modifier = Modifier.padding(14.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text("⏰", fontSize = 18.sp)
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(
+                                            text = "Будильник и Напоминание",
+                                            style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold)
+                                        )
                                     }
-                                },
-                                shape = RoundedCornerShape(12.dp),
-                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
-                            ) {
-                                Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(16.dp))
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text("AI Декомпозиция", fontSize = 12.sp)
+
+                                    if (dueDate != null) {
+                                        IconButton(
+                                            onClick = { dueDate = null },
+                                            modifier = Modifier.size(28.dp)
+                                        ) {
+                                            Icon(
+                                                Icons.Default.Close,
+                                                contentDescription = "Удалить напоминание",
+                                                tint = MaterialTheme.colorScheme.error,
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                        }
+                                    }
+                                }
+
+                                if (dueDate != null) {
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    Surface(
+                                        shape = RoundedCornerShape(10.dp),
+                                        color = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Icon(
+                                                Icons.Default.Alarm,
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.onPrimary,
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Text(
+                                                text = formatReminderDisplay(dueDate),
+                                                style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
+                                                color = MaterialTheme.colorScheme.onPrimary
+                                            )
+                                        }
+                                    }
+                                } else {
+                                    Text(
+                                        text = "Установите точное время, чтобы получить громкий сигнал и уведомление:",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.padding(top = 4.dp, bottom = 8.dp)
+                                    )
+                                }
+
+                                Spacer(modifier = Modifier.height(8.dp))
+
+                                // Quick Presets
+                                Text(
+                                    text = "Быстрый выбор:",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    FilterChip(
+                                        selected = false,
+                                        onClick = {
+                                            dueDate = System.currentTimeMillis() + 15 * 60 * 1000L
+                                        },
+                                        label = { Text("+15м", fontSize = 11.sp) }
+                                    )
+                                    FilterChip(
+                                        selected = false,
+                                        onClick = {
+                                            dueDate = System.currentTimeMillis() + 60 * 60 * 1000L
+                                        },
+                                        label = { Text("+1ч", fontSize = 11.sp) }
+                                    )
+                                    FilterChip(
+                                        selected = false,
+                                        onClick = {
+                                            val cal = Calendar.getInstance().apply {
+                                                set(Calendar.HOUR_OF_DAY, 18)
+                                                set(Calendar.MINUTE, 0)
+                                                set(Calendar.SECOND, 0)
+                                                if (timeInMillis <= System.currentTimeMillis()) {
+                                                    add(Calendar.DAY_OF_YEAR, 1)
+                                                }
+                                            }
+                                            dueDate = cal.timeInMillis
+                                        },
+                                        label = { Text("18:00", fontSize = 11.sp) }
+                                    )
+                                    FilterChip(
+                                        selected = false,
+                                        onClick = {
+                                            val cal = Calendar.getInstance().apply {
+                                                add(Calendar.DAY_OF_YEAR, 1)
+                                                set(Calendar.HOUR_OF_DAY, 9)
+                                                set(Calendar.MINUTE, 0)
+                                                set(Calendar.SECOND, 0)
+                                            }
+                                            dueDate = cal.timeInMillis
+                                        },
+                                        label = { Text("Завтра 9:00", fontSize = 11.sp) }
+                                    )
+                                }
+
+                                Spacer(modifier = Modifier.height(8.dp))
+
+                                OutlinedButton(
+                                    onClick = { showDatePicker = true },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(12.dp)
+                                ) {
+                                    Icon(Icons.Default.CalendarMonth, contentDescription = null, modifier = Modifier.size(18.dp))
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("Выбрать точную дату и время")
+                                }
                             }
                         }
+                    }
 
+                    // Recurrence Rule Selection
+                    item {
+                        Text(
+                            text = "Повторение квеста (Цикличность)",
+                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold)
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            RecurrenceRule.values().forEach { rule ->
+                                val isSelected = recurrence == rule
+                                FilterChip(
+                                    selected = isSelected,
+                                    onClick = { recurrence = rule },
+                                    label = { Text(rule.titleRu, fontSize = 11.sp) }
+                                )
+                            }
+                        }
+                    }
+
+                    // Subtasks Checklist
+                    item {
+                        Text(
+                            text = "Подзадачи (Чек-лист)",
+                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold)
+                        )
                         Spacer(modifier = Modifier.height(6.dp))
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -375,7 +453,7 @@ fun TaskEditDialog(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            listOf(5, 15, 25, 45, 60).forEach { mins ->
+                            listOf(15, 25, 45, 60).forEach { mins ->
                                 FilterChip(
                                     selected = estimatedMinutes == mins,
                                     onClick = { estimatedMinutes = mins },
@@ -433,12 +511,10 @@ fun TaskEditDialog(
                                     description = description.trim(),
                                     category = category,
                                     priority = priority,
-                                    energyRequired = energyRequired,
-                                    fieldWhy = fieldWhy.trim(),
-                                    isStrictDeadline = isStrictDeadline,
                                     recurrence = recurrence,
                                     estimatedMinutes = estimatedMinutes,
                                     inCurrentQuest = inCurrentQuest,
+                                    dueDate = dueDate,
                                     subtasksRaw = TaskItem.serializeSubtasks(subtasks)
                                 )
                                 onSaveTask(taskToSave)
@@ -457,5 +533,70 @@ fun TaskEditDialog(
                 }
             }
         }
+    }
+
+    // Material 3 Date Picker Dialog
+    if (showDatePicker) {
+        val datePickerState = rememberDatePickerState(
+            initialSelectedDateMillis = dueDate ?: System.currentTimeMillis()
+        )
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    showDatePicker = false
+                    val selectedDate = datePickerState.selectedDateMillis ?: System.currentTimeMillis()
+
+                    // Now open TimePickerDialog
+                    val initialCal = Calendar.getInstance().apply {
+                        if (dueDate != null) timeInMillis = dueDate!!
+                    }
+                    val timePicker = TimePickerDialog(
+                        context,
+                        { _, hourOfDay, minute ->
+                            val finalCal = Calendar.getInstance().apply {
+                                timeInMillis = selectedDate
+                                set(Calendar.HOUR_OF_DAY, hourOfDay)
+                                set(Calendar.MINUTE, minute)
+                                set(Calendar.SECOND, 0)
+                            }
+                            dueDate = finalCal.timeInMillis
+                        },
+                        initialCal.get(Calendar.HOUR_OF_DAY),
+                        initialCal.get(Calendar.MINUTE),
+                        true
+                    )
+                    timePicker.show()
+                }) {
+                    Text("Далее (выбор времени)")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDatePicker = false }) {
+                    Text("Отмена")
+                }
+            }
+        ) {
+            DatePicker(state = datePickerState)
+        }
+    }
+}
+
+private fun formatReminderDisplay(timestamp: Long?): String {
+    if (timestamp == null) return "Без напоминания"
+    val cal = Calendar.getInstance().apply { timeInMillis = timestamp }
+    val today = Calendar.getInstance()
+    val isToday = cal.get(Calendar.YEAR) == today.get(Calendar.YEAR) &&
+            cal.get(Calendar.DAY_OF_YEAR) == today.get(Calendar.DAY_OF_YEAR)
+    val tomorrow = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, 1) }
+    val isTomorrow = cal.get(Calendar.YEAR) == tomorrow.get(Calendar.YEAR) &&
+            cal.get(Calendar.DAY_OF_YEAR) == tomorrow.get(Calendar.DAY_OF_YEAR)
+    val timeFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
+    val dateFormat = SimpleDateFormat("d MMMM в HH:mm", Locale("ru"))
+
+    return when {
+        isToday -> "Сегодня в ${timeFormat.format(cal.time)}"
+        isTomorrow -> "Завтра в ${timeFormat.format(cal.time)}"
+        else -> dateFormat.format(cal.time)
     }
 }
