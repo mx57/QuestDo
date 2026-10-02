@@ -21,6 +21,7 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -72,6 +73,7 @@ class MainActivity : ComponentActivity() {
             val selectedPriority by viewModel.selectedPriorityFilter.collectAsStateWithLifecycle()
             val urgentTasks by viewModel.urgentTasks.collectAsStateWithLifecycle()
             val staleTasks by viewModel.staleTasks.collectAsStateWithLifecycle()
+            val timerState by viewModel.timerState.collectAsStateWithLifecycle()
 
             var currentTab by remember { mutableStateOf(MainTab.QUEST) }
             var taskToEdit by remember { mutableStateOf<TaskItem?>(null) }
@@ -121,6 +123,28 @@ class MainActivity : ComponentActivity() {
                                     }
                                 },
                                 actions = {
+                                    // Running Timer Quick Status Chip
+                                    if (timerState.isRunning && currentTab != MainTab.FOCUS) {
+                                        Surface(
+                                            shape = RoundedCornerShape(12.dp),
+                                            color = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier
+                                                .padding(end = 6.dp)
+                                                .clickable { currentTab = MainTab.FOCUS }
+                                        ) {
+                                            Row(
+                                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Text(
+                                                    text = "⏳ ${timerState.formattedTime}",
+                                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                                    color = MaterialTheme.colorScheme.onPrimary
+                                                )
+                                            }
+                                        }
+                                    }
+
                                     // Interactive Mood switcher pill
                                     Surface(
                                         shape = RoundedCornerShape(12.dp),
@@ -180,7 +204,22 @@ class MainActivity : ComponentActivity() {
                                 NavigationBarItem(
                                     selected = currentTab == MainTab.FOCUS,
                                     onClick = { currentTab = MainTab.FOCUS },
-                                    icon = { Icon(if (currentTab == MainTab.FOCUS) Icons.Default.HourglassBottom else Icons.Outlined.HourglassBottom, contentDescription = null) },
+                                    icon = {
+                                        BadgedBox(
+                                            badge = {
+                                                if (timerState.isRunning) {
+                                                    Badge(containerColor = MaterialTheme.colorScheme.primary) {
+                                                        Text(timerState.formattedTime, fontSize = 9.sp)
+                                                    }
+                                                }
+                                            }
+                                        ) {
+                                            Icon(
+                                                if (currentTab == MainTab.FOCUS) Icons.Default.HourglassBottom else Icons.Outlined.HourglassBottom,
+                                                contentDescription = null
+                                            )
+                                        }
+                                    },
                                     label = { Text("Фокус") },
                                     modifier = Modifier.testTag("nav_focus")
                                 )
@@ -238,6 +277,7 @@ class MainActivity : ComponentActivity() {
                                     onShuffleQuest = { viewModel.shuffleCurrentQuest() },
                                     onStartFocusOnTask = { task ->
                                         spotlightFocusTask = task
+                                        viewModel.setSpotlightTask(task)
                                         currentTab = MainTab.FOCUS
                                     },
                                     onOpenSOS = { viewModel.openAntiProcrastinationDialog() },
@@ -278,10 +318,20 @@ class MainActivity : ComponentActivity() {
                                 )
 
                                 MainTab.FOCUS -> FocusTimerScreen(
-                                    spotlightTask = spotlightFocusTask,
+                                    timerState = timerState,
+                                    spotlightTask = spotlightFocusTask ?: (currentTasks + backlogTasks).find { it.id == timerState.spotlightTaskId },
                                     currentQuestTasks = currentTasks,
-                                    onCompleteSession = { mins -> viewModel.logFocusSession(mins) },
-                                    onSelectTask = { spotlightFocusTask = it }
+                                    onStartTimer = { viewModel.startTimer() },
+                                    onPauseTimer = { viewModel.pauseTimer() },
+                                    onResetTimer = { viewModel.resetTimer() },
+                                    onSetDuration = { mins -> viewModel.setTimerDuration(mins) },
+                                    onSetActiveSound = { sound -> viewModel.setActiveSound(sound) },
+                                    onToggleMute = { viewModel.toggleTimerMute() },
+                                    onDismissCompletedDialog = { viewModel.dismissTimerCompletedDialog() },
+                                    onSelectTask = { task ->
+                                        spotlightFocusTask = task
+                                        viewModel.setSpotlightTask(task)
+                                    }
                                 )
 
                                 MainTab.REWARDS -> RewardsScreen(

@@ -24,6 +24,7 @@ import com.example.data.model.RecurrenceRule
 import com.example.data.model.SubTask
 import com.example.data.model.TaskItem
 import com.example.ui.theme.GoldAccent
+import com.example.util.SystemAlarmHelper
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -45,6 +46,7 @@ fun TaskEditDialog(
     var estimatedMinutes by remember { mutableIntStateOf(initialTask?.estimatedMinutes ?: 25) }
     var inCurrentQuest by remember { mutableStateOf(initialTask?.inCurrentQuest ?: false) }
     var dueDate by remember { mutableStateOf<Long?>(initialTask?.dueDate) }
+    var syncWithSystemAlarm by remember { mutableStateOf(true) }
 
     var subtasks by remember {
         mutableStateOf(initialTask?.getSubtasksList() ?: emptyList())
@@ -259,6 +261,52 @@ fun TaskEditDialog(
                                                 color = MaterialTheme.colorScheme.onPrimary
                                             )
                                         }
+                                    }
+
+                                    Spacer(modifier = Modifier.height(8.dp))
+
+                                    // System Clock Alarm Integration Switch
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(
+                                                text = "Звонок в системных Часах",
+                                                style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold)
+                                            )
+                                            Text(
+                                                text = "Ставит будильник в стандартное приложение часов",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                        Switch(
+                                            checked = syncWithSystemAlarm,
+                                            onCheckedChange = { syncWithSystemAlarm = it }
+                                        )
+                                    }
+
+                                    Spacer(modifier = Modifier.height(6.dp))
+
+                                    // Instant Test/Set Alarm Action
+                                    FilledTonalButton(
+                                        onClick = {
+                                            dueDate?.let { ms ->
+                                                SystemAlarmHelper.setSystemAlarmFromTimestamp(
+                                                    context,
+                                                    ms,
+                                                    "⚔️ Квест: ${title.ifBlank { "Задача" }}"
+                                                )
+                                            }
+                                        },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        shape = RoundedCornerShape(12.dp)
+                                    ) {
+                                        Icon(Icons.Default.AlarmAdd, contentDescription = null, modifier = Modifier.size(16.dp))
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text("Поставить в системных часах сейчас ⏰", fontSize = 11.sp)
                                     }
                                 } else {
                                     Text(
@@ -518,6 +566,14 @@ fun TaskEditDialog(
                                     subtasksRaw = TaskItem.serializeSubtasks(subtasks)
                                 )
                                 onSaveTask(taskToSave)
+                                if (syncWithSystemAlarm && dueDate != null) {
+                                    SystemAlarmHelper.setSystemAlarmFromTimestamp(
+                                        context,
+                                        dueDate!!,
+                                        "⚔️ Квест: ${title.trim()}",
+                                        skipUi = true
+                                    )
+                                }
                                 onDismiss()
                             }
                         },

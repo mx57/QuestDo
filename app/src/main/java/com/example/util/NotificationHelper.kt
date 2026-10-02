@@ -31,11 +31,18 @@ object NotificationHelper {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
-            val audioAttributes = AudioAttributes.Builder()
+            val alarmAudioAttributes = AudioAttributes.Builder()
+                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                .setUsage(AudioAttributes.USAGE_ALARM)
+                .build()
+            val alarmSoundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
+                ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+
+            val notificationAudioAttributes = AudioAttributes.Builder()
                 .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
                 .setUsage(AudioAttributes.USAGE_NOTIFICATION)
                 .build()
-            val soundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+            val notificationSoundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
 
             // 1. Task Reminders & Alarms Channel
             val taskChannel = NotificationChannel(
@@ -47,8 +54,8 @@ object NotificationHelper {
                 enableLights(true)
                 lightColor = Color.rgb(255, 193, 7) // Gold
                 enableVibration(true)
-                vibrationPattern = longArrayOf(0, 200, 100, 250, 100, 300)
-                setSound(soundUri, audioAttributes)
+                vibrationPattern = longArrayOf(0, 300, 150, 300, 150, 450)
+                setSound(alarmSoundUri, alarmAudioAttributes)
             }
 
             // 2. Focus Timer Finished Channel
@@ -61,8 +68,8 @@ object NotificationHelper {
                 enableLights(true)
                 lightColor = Color.rgb(103, 80, 164)
                 enableVibration(true)
-                vibrationPattern = longArrayOf(0, 150, 80, 200, 80, 300)
-                setSound(soundUri, audioAttributes)
+                vibrationPattern = longArrayOf(0, 200, 100, 250, 100, 350)
+                setSound(alarmSoundUri, alarmAudioAttributes)
             }
 
             // 3. Daily Motivation Channel

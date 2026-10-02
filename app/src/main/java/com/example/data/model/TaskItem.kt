@@ -44,6 +44,17 @@ data class TaskItem(
         return tagsRaw.split(",").map { it.trim() }.filter { it.isNotEmpty() }
     }
 
+    val categoryEmoji: String
+        get() = when (category) {
+            "Работа" -> "💼"
+            "Учеба" -> "📚"
+            "Здоровье" -> "❤️"
+            "Дом" -> "🏠"
+            "Развитие" -> "🌱"
+            "Финансы" -> "💰"
+            else -> "🎯"
+        }
+
     companion object {
         fun serializeSubtasks(list: List<SubTask>): String {
             return list.joinToString(";") { "${it.title}|${if (it.isDone) "1" else "0"}" }

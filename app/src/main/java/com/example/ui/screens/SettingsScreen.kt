@@ -27,6 +27,8 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import com.example.data.model.*
 import com.example.ui.theme.GoldAccent
+import com.example.util.SystemAlarmHelper
+import java.util.Calendar
 
 @Composable
 fun SettingsScreen(
@@ -211,8 +213,112 @@ fun SettingsScreen(
 
                     Spacer(modifier = Modifier.height(14.dp))
 
+                    // Exact Alarm Permission Status (Android 12+)
+                    if (!SystemAlarmHelper.canScheduleExactAlarms(context)) {
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = MaterialTheme.colorScheme.errorContainer,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 12.dp)
+                                .clickable { SystemAlarmHelper.checkAndOpenExactAlarmSettings(context) }
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text("⚠️", fontSize = 18.sp)
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Column {
+                                    Text(
+                                        text = "Точные будильники отключены",
+                                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                                        color = MaterialTheme.colorScheme.onErrorContainer
+                                    )
+                                    Text(
+                                        text = "Нажмите, чтобы включить в настройках Android для надежного срабатывания",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onErrorContainer
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    // System Alarm Clock Direct Integrations
+                    Text("Взаимодействие с системными Часами Android:", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold), color = MaterialTheme.colorScheme.primary)
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick = {
+                                SystemAlarmHelper.openSystemAlarms(context)
+                            },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Icon(Icons.Default.Alarm, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Будильники", fontSize = 11.sp)
+                        }
+
+                        OutlinedButton(
+                            onClick = {
+                                SystemAlarmHelper.openSystemTimers(context)
+                            },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Icon(Icons.Default.HourglassBottom, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Таймеры", fontSize = 11.sp)
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        FilledTonalButton(
+                            onClick = {
+                                val cal = Calendar.getInstance().apply { add(Calendar.MINUTE, 1) }
+                                SystemAlarmHelper.setSystemAlarm(
+                                    context,
+                                    cal.get(Calendar.HOUR_OF_DAY),
+                                    cal.get(Calendar.MINUTE),
+                                    "⚔️ Тест будильника QuestDo"
+                                )
+                            },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Text("⏰ Системный (+1м)", fontSize = 10.sp)
+                        }
+
+                        FilledTonalButton(
+                            onClick = {
+                                SystemAlarmHelper.setSystemTimer(
+                                    context,
+                                    30,
+                                    "🍅 Тест таймера QuestDo"
+                                )
+                            },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Text("⏱️ Системный (30с)", fontSize = 10.sp)
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
                     // Verification Test Action Buttons
-                    Text("Инструменты проверки в реальном времени:", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold), color = MaterialTheme.colorScheme.primary)
+                    Text("Внутренние тесты приложения QuestDo:", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold), color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Spacer(modifier = Modifier.height(6.dp))
 
                     Row(
@@ -238,7 +344,7 @@ fun SettingsScreen(
                             modifier = Modifier.weight(1f),
                             shape = RoundedCornerShape(12.dp)
                         ) {
-                            Text("⏰ Тест будильника (10с)", fontSize = 11.sp)
+                            Text("⏰ Тест in-app (10с)", fontSize = 11.sp)
                         }
                     }
                 }

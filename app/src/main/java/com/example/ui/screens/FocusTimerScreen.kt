@@ -5,6 +5,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -33,94 +34,27 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.example.data.model.TaskItem
 import com.example.ui.theme.GoldAccent
-import com.example.util.NotificationHelper
-import com.example.util.QuestAlarmScheduler
-import com.example.util.SoundEffectsHelper
-import kotlinx.coroutines.delay
+import com.example.ui.viewmodel.FocusTimerUiState
+import com.example.util.SystemAlarmHelper
 
 @Composable
 fun FocusTimerScreen(
+    timerState: FocusTimerUiState,
     spotlightTask: TaskItem?,
     currentQuestTasks: List<TaskItem>,
-    onCompleteSession: (minutes: Int) -> Unit,
+    onStartTimer: () -> Unit,
+    onPauseTimer: () -> Unit,
+    onResetTimer: () -> Unit,
+    onSetDuration: (Int) -> Unit,
+    onSetActiveSound: (String) -> Unit,
+    onToggleMute: () -> Unit,
+    onDismissCompletedDialog: () -> Unit,
     onSelectTask: (TaskItem) -> Unit
 ) {
     val context = LocalContext.current
-    val soundHelper = remember { SoundEffectsHelper(context) }
-
-    var totalTimeMinutes by remember { mutableIntStateOf(spotlightTask?.estimatedMinutes ?: 25) }
-    var timeLeftSeconds by remember { mutableIntStateOf(totalTimeMinutes * 60) }
-    var isRunning by remember { mutableStateOf(false) }
-    var targetEndTimeMs by remember { mutableLongStateOf(0L) }
-    var activeSound by remember { mutableStateOf("Шум дождя 🌧️") }
-    var isMuted by remember { mutableStateOf(false) }
-
-    var showCompletedDialog by remember { mutableStateOf(false) }
     var showTaskPickerMenu by remember { mutableStateOf(false) }
 
     val soundOptions = listOf("Тишина 🤫", "Шум дождя 🌧️", "Белый шум 📻", "Костер 🔥", "Космос 🌌")
-
-    // Stop ambient audio on screen dispose
-    DisposableEffect(Unit) {
-        onDispose {
-            soundHelper.stopAmbientAudio()
-            if (isRunning) {
-                QuestAlarmScheduler.cancelFocusTimerAlarm(context)
-            }
-        }
-    }
-
-    // Reset timeLeftSeconds when totalTimeMinutes changes while stopped
-    LaunchedEffect(totalTimeMinutes) {
-        if (!isRunning) {
-            timeLeftSeconds = totalTimeMinutes * 60
-        }
-    }
-
-    // Handle ambient sound playback when running status or active sound changes
-    LaunchedEffect(isRunning, activeSound, isMuted) {
-        if (isRunning && !isMuted && activeSound != "Тишина 🤫") {
-            soundHelper.startAmbientAudio(activeSound)
-        } else {
-            soundHelper.stopAmbientAudio()
-        }
-    }
-
-    // Rock-solid timer loop with wall-clock sync and zero drift
-    LaunchedEffect(isRunning) {
-        if (isRunning) {
-            targetEndTimeMs = System.currentTimeMillis() + (timeLeftSeconds * 1000L)
-            // Schedule AlarmManager alert in case user minimizes app or locks screen
-            QuestAlarmScheduler.scheduleFocusTimerAlarm(context, timeLeftSeconds, spotlightTask?.title)
-
-            while (isRunning && timeLeftSeconds > 0) {
-                delay(500)
-                val remainingMs = targetEndTimeMs - System.currentTimeMillis()
-                val newSeconds = ((remainingMs + 999) / 1000).toInt().coerceAtLeast(0)
-                timeLeftSeconds = newSeconds
-
-                if (timeLeftSeconds <= 0) {
-                    isRunning = false
-                    soundHelper.stopAmbientAudio()
-                    soundHelper.playVictoryChime()
-                    soundHelper.triggerVibration("VICTORY")
-                    NotificationHelper.showTimerCompleted(context, totalTimeMinutes, spotlightTask?.title)
-                    onCompleteSession(totalTimeMinutes)
-                    showCompletedDialog = true
-                    break
-                }
-            }
-        } else {
-            QuestAlarmScheduler.cancelFocusTimerAlarm(context)
-        }
-    }
-
-    val totalSeconds = (totalTimeMinutes * 60).coerceAtLeast(1)
-    val progress = (totalSeconds - timeLeftSeconds).toFloat() / totalSeconds.toFloat()
-
-    val minutes = timeLeftSeconds / 60
-    val seconds = timeLeftSeconds % 60
-    val formattedTime = String.format("%02d:%02d", minutes, seconds)
 
     // Animated Soundwave Visualizer Bars
     val infiniteTransition = rememberInfiniteTransition(label = "soundwave")
@@ -158,138 +92,256 @@ fun FocusTimerScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .clickable { showTaskPickerMenu = true }
+                .testTag("spotlight_task_card")
         ) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(14.dp),
-                verticalAlignment = Alignment.CenterVertically
+                    .padding(horizontal = 16.dp, vertical = 14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Text("🎯", fontSize = 24.sp)
-                Spacer(modifier = Modifier.width(12.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "ФОКУС НА КВЕСТЕ (нажмите для смены)",
-                        style = MaterialTheme.typography.labelSmall.copy(
-                            fontWeight = FontWeight.Bold,
-                            letterSpacing = 1.sp
-                        ),
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                    Spacer(modifier = Modifier.height(2.dp))
-                    Text(
-                        text = spotlightTask?.title ?: (currentQuestTasks.firstOrNull()?.title ?: "Свободная сессия глубокого фокуса"),
-                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-                        maxLines = 1
-                    )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(40.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("🎯", fontSize = 20.sp)
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column {
+                        Text(
+                            text = "Фокус на квесте:",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            text = spotlightTask?.title ?: timerState.spotlightTaskTitle ?: "Свободная сессия концентрации",
+                            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                            maxLines = 1
+                        )
+                    }
                 }
-                Icon(Icons.Default.ArrowDropDown, contentDescription = null)
+                Icon(
+                    Icons.Default.ArrowDropDown,
+                    contentDescription = "Выбрать квест",
+                    tint = MaterialTheme.colorScheme.primary
+                )
             }
         }
 
-        // Circular Timer Display with Glowing Ring
+        // Circular Neon Progress Timer Display
         Box(
-            modifier = Modifier.size(240.dp),
-            contentAlignment = Alignment.Center
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .size(240.dp)
+                .padding(8.dp)
         ) {
             val primaryColor = MaterialTheme.colorScheme.primary
-            val surfaceVariantColor = MaterialTheme.colorScheme.surfaceVariant
+            val trackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+            val animatedProgress by animateFloatAsState(
+                targetValue = timerState.progress,
+                animationSpec = tween(durationMillis = 300, easing = LinearEasing),
+                label = "progress"
+            )
 
             Canvas(modifier = Modifier.fillMaxSize()) {
                 val strokeWidth = 14.dp.toPx()
                 val radius = (size.minDimension - strokeWidth) / 2
-                val topLeft = Offset((size.width - radius * 2) / 2, (size.height - radius * 2) / 2)
-                val arcSize = Size(radius * 2, radius * 2)
+                val centerOffset = Offset(size.width / 2, size.height / 2)
 
-                // Background track
-                drawArc(
-                    color = surfaceVariantColor,
-                    startAngle = -90f,
-                    sweepAngle = 360f,
-                    useCenter = false,
-                    topLeft = topLeft,
-                    size = arcSize,
-                    style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
+                // Background Track
+                drawCircle(
+                    color = trackColor,
+                    radius = radius,
+                    center = centerOffset,
+                    style = Stroke(width = strokeWidth)
                 )
 
-                // Active progress arc with gradient
+                // Neon Gradient Arc
+                val sweepAngle = animatedProgress * 360f
                 drawArc(
                     brush = Brush.sweepGradient(
-                        colors = listOf(primaryColor, GoldAccent, primaryColor)
+                        listOf(primaryColor, GoldAccent, primaryColor),
+                        center = centerOffset
                     ),
                     startAngle = -90f,
-                    sweepAngle = 360f * progress,
+                    sweepAngle = sweepAngle,
                     useCenter = false,
-                    topLeft = topLeft,
-                    size = arcSize,
+                    topLeft = Offset(centerOffset.x - radius, centerOffset.y - radius),
+                    size = Size(radius * 2, radius * 2),
                     style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
                 )
             }
 
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            // Digital Counter & Status Inside Circle
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
                 Text(
-                    text = formattedTime,
-                    style = MaterialTheme.typography.displayMedium.copy(fontWeight = FontWeight.Black),
+                    text = timerState.formattedTime,
+                    style = MaterialTheme.typography.displayMedium.copy(
+                        fontWeight = FontWeight.Black,
+                        letterSpacing = 1.sp
+                    ),
                     color = MaterialTheme.colorScheme.onSurface
                 )
-                Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    text = if (isRunning) "ПОТОК АКТИВЕН ⚡" else "ГОТОВ К ШТУРМУ",
-                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
-                    color = if (isRunning) GoldAccent else MaterialTheme.colorScheme.onSurfaceVariant
-                )
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = if (timerState.isRunning) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant
+                ) {
+                    Text(
+                        text = if (timerState.isRunning) "🔥 В ПОТОКЕ" else "⏸️ ПАУЗА",
+                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                        color = if (timerState.isRunning) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                    )
+                }
+
+                // Mini soundwave indicators when running
+                if (timerState.isRunning && !timerState.isMuted) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .width(3.dp)
+                                .height((wave1 * 16).dp)
+                                .clip(RoundedCornerShape(2.dp))
+                                .background(MaterialTheme.colorScheme.primary)
+                        )
+                        Box(
+                            modifier = Modifier
+                                .width(3.dp)
+                                .height((wave2 * 20).dp)
+                                .clip(RoundedCornerShape(2.dp))
+                                .background(GoldAccent)
+                        )
+                        Box(
+                            modifier = Modifier
+                                .width(3.dp)
+                                .height((wave3 * 14).dp)
+                                .clip(RoundedCornerShape(2.dp))
+                                .background(MaterialTheme.colorScheme.primary)
+                        )
+                    }
+                }
             }
         }
 
-        // Ambient Sound Controls with Live Synthesizer
-        Surface(
-            shape = RoundedCornerShape(16.dp),
-            color = MaterialTheme.colorScheme.surface,
-            tonalElevation = 2.dp,
+        // Ambient Sound Atmosphere Selector
+        Card(
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surface
+            ),
             modifier = Modifier.fillMaxWidth()
         ) {
-            Column(
-                modifier = Modifier.padding(14.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
+            Column(modifier = Modifier.padding(14.dp)) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        IconButton(
-                            onClick = { isMuted = !isMuted },
-                            modifier = Modifier.size(40.dp)
-                        ) {
-                            Icon(
-                                if (isMuted) Icons.Default.VolumeOff else Icons.Default.VolumeUp,
-                                contentDescription = "Звук",
-                                tint = if (isMuted) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
-                            )
-                        }
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = if (isMuted) "Звук отключен" else "Фон: $activeSound",
-                            style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium)
+                    Text(
+                        text = "🎧 Фоновая атмосфера",
+                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold)
+                    )
+
+                    IconButton(
+                        onClick = onToggleMute,
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Icon(
+                            imageVector = if (timerState.isMuted) Icons.Default.VolumeOff else Icons.Default.VolumeUp,
+                            contentDescription = "Mute",
+                            tint = if (timerState.isMuted) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
                         )
                     }
+                }
 
-                    // Animated sound visualizer bars
+                Spacer(modifier = Modifier.height(6.dp))
+
+                LazyRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(soundOptions) { sound ->
+                        val isSelected = timerState.activeSound == sound
+                        FilterChip(
+                            selected = isSelected,
+                            onClick = { onSetActiveSound(sound) },
+                            label = { Text(sound, fontSize = 12.sp) },
+                            leadingIcon = if (isSelected) {
+                                { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(14.dp)) }
+                            } else null
+                        )
+                    }
+                }
+            }
+        }
+
+        // Pomodoro Duration Presets
+        Card(
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surface
+            ),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(14.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "⏱️ Длительность сессии",
+                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold)
+                    )
+
                     Row(
-                        horizontalArrangement = Arrangement.spacedBy(3.dp),
-                        verticalAlignment = Alignment.Bottom,
-                        modifier = Modifier.height(18.dp)
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        val heights = listOf(wave1, wave2, wave3, wave2, wave1)
-                        heights.forEach { h ->
-                            Box(
-                                modifier = Modifier
-                                    .width(4.dp)
-                                    .fillMaxHeight(if (isRunning && !isMuted && activeSound != "Тишина 🤫") h else 0.2f)
-                                    .clip(RoundedCornerShape(2.dp))
-                                    .background(MaterialTheme.colorScheme.primary)
-                            )
+                        FilledTonalIconButton(
+                            onClick = {
+                                val newDuration = (timerState.totalTimeMinutes - 5).coerceAtLeast(5)
+                                onSetDuration(newDuration)
+                            },
+                            enabled = !timerState.isRunning && timerState.totalTimeMinutes > 5,
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Text("-5", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        }
+
+                        Text(
+                            text = "${timerState.totalTimeMinutes}м",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 14.sp
+                        )
+
+                        FilledTonalIconButton(
+                            onClick = {
+                                val newDuration = (timerState.totalTimeMinutes + 5).coerceAtMost(180)
+                                onSetDuration(newDuration)
+                            },
+                            enabled = !timerState.isRunning && timerState.totalTimeMinutes < 180,
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Text("+5", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                         }
                     }
                 }
@@ -298,104 +350,34 @@ fun FocusTimerScreen(
 
                 LazyRow(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    items(soundOptions) { snd ->
+                    items(listOf(
+                        Pair(5, "5м ☕"),
+                        Pair(15, "15м 🌿"),
+                        Pair(25, "25м 🍅"),
+                        Pair(45, "45м 🚀"),
+                        Pair(60, "60м ⚔️")
+                    )) { (mins, label) ->
                         FilterChip(
-                            selected = activeSound == snd,
-                            onClick = { activeSound = snd },
-                            label = { Text(snd, fontSize = 11.sp) }
+                            selected = timerState.totalTimeMinutes == mins,
+                            onClick = { onSetDuration(mins) },
+                            enabled = !timerState.isRunning,
+                            label = { Text(label, fontSize = 12.sp) }
                         )
                     }
                 }
             }
         }
 
-        // Pomodoro Intervals & Duration Adjustment
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "Длительность интервала:",
-                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-
-                // Plus / Minus Stepper
-                if (!isRunning) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        FilledTonalIconButton(
-                            onClick = {
-                                if (totalTimeMinutes > 5) {
-                                    totalTimeMinutes -= 5
-                                    timeLeftSeconds = totalTimeMinutes * 60
-                                }
-                            },
-                            modifier = Modifier.size(36.dp)
-                        ) {
-                            Text("-5", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                        }
-                        Spacer(modifier = Modifier.width(6.dp))
-                        FilledTonalIconButton(
-                            onClick = {
-                                if (totalTimeMinutes < 120) {
-                                    totalTimeMinutes += 5
-                                    timeLeftSeconds = totalTimeMinutes * 60
-                                }
-                            },
-                            modifier = Modifier.size(36.dp)
-                        ) {
-                            Text("+5", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                        }
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            LazyRow(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                items(listOf(
-                    Pair(5, "5м ☕"),
-                    Pair(15, "15м 🌿"),
-                    Pair(25, "25м 🍅"),
-                    Pair(45, "45м 🚀"),
-                    Pair(60, "60м ⚔️")
-                )) { (mins, label) ->
-                    FilterChip(
-                        selected = totalTimeMinutes == mins,
-                        onClick = {
-                            if (!isRunning) {
-                                totalTimeMinutes = mins
-                                timeLeftSeconds = mins * 60
-                            }
-                        },
-                        label = { Text(label, fontSize = 12.sp) }
-                    )
-                }
-            }
-        }
-
-        // Controls: Start, Pause, Reset
+        // Primary Controls: Start, Pause, Reset
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(14.dp),
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             OutlinedButton(
-                onClick = {
-                    isRunning = false
-                    soundHelper.stopAmbientAudio()
-                    QuestAlarmScheduler.cancelFocusTimerAlarm(context)
-                    timeLeftSeconds = totalTimeMinutes * 60
-                },
+                onClick = onResetTimer,
                 modifier = Modifier
                     .weight(1f)
                     .height(52.dp),
@@ -408,7 +390,7 @@ fun FocusTimerScreen(
 
             Button(
                 onClick = {
-                    isRunning = !isRunning
+                    if (timerState.isRunning) onPauseTimer() else onStartTimer()
                 },
                 modifier = Modifier
                     .weight(1.5f)
@@ -416,21 +398,88 @@ fun FocusTimerScreen(
                     .testTag("toggle_focus_timer_button"),
                 shape = RoundedCornerShape(16.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = if (isRunning) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
+                    containerColor = if (timerState.isRunning) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
                 )
             ) {
                 Icon(
-                    if (isRunning) Icons.Default.Pause else Icons.Default.PlayArrow,
+                    if (timerState.isRunning) Icons.Default.Pause else Icons.Default.PlayArrow,
                     contentDescription = null
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = if (isRunning) "Пауза" else "Старт Потока",
+                    text = if (timerState.isRunning) "Пауза" else "Старт Потока",
                     fontWeight = FontWeight.Bold,
                     fontSize = 15.sp
                 )
             }
         }
+
+        // System Clock Integration Row (Direct Android System Alarm & Timer)
+        Surface(
+            shape = RoundedCornerShape(16.dp),
+            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 14.dp, vertical = 10.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Icon(
+                        Icons.Default.Alarm,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Column {
+                        Text(
+                            text = "Системные часы Android",
+                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold)
+                        )
+                        Text(
+                            text = "Запустить нативный таймер или будильник",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    FilledTonalButton(
+                        onClick = {
+                            val taskTitle = spotlightTask?.title ?: timerState.spotlightTaskTitle ?: "Фокус-сессия"
+                            val secondsToRun = if (timerState.timeLeftSeconds > 0) timerState.timeLeftSeconds else timerState.totalTimeMinutes * 60
+                            SystemAlarmHelper.setSystemTimer(context, secondsToRun, "🍅 $taskTitle")
+                        },
+                        shape = RoundedCornerShape(10.dp),
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
+                    ) {
+                        Text("⏱️ В часы", fontSize = 11.sp)
+                    }
+
+                    IconButton(
+                        onClick = { SystemAlarmHelper.openSystemAlarms(context) },
+                        modifier = Modifier.size(36.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.Launch,
+                            contentDescription = "Открыть часы",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
     }
 
     // Modal: Task Selector
@@ -450,47 +499,58 @@ fun FocusTimerScreen(
 
                     if (currentQuestTasks.isEmpty()) {
                         Text(
-                            text = "В текущем квесте нет открытых задач",
+                            text = "В текущем квесте пока нет активных задач. Вы можете фокусироваться в свободной сессии.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     } else {
-                        currentQuestTasks.forEach { task ->
-                            Surface(
-                                shape = RoundedCornerShape(10.dp),
-                                color = if (spotlightTask?.id == task.id) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 4.dp)
-                                    .clickable {
-                                        onSelectTask(task)
-                                        totalTimeMinutes = task.estimatedMinutes
-                                        timeLeftSeconds = task.estimatedMinutes * 60
-                                        showTaskPickerMenu = false
-                                    }
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(10.dp),
-                                    verticalAlignment = Alignment.CenterVertically
+                        LazyColumn(
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.heightIn(max = 280.dp)
+                        ) {
+                            items(currentQuestTasks) { task ->
+                                Surface(
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = if (task.id == spotlightTask?.id || task.id == timerState.spotlightTaskId)
+                                        MaterialTheme.colorScheme.primaryContainer
+                                    else
+                                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable {
+                                            onSelectTask(task)
+                                            showTaskPickerMenu = false
+                                        }
                                 ) {
-                                    Text(if (task.isCompleted) "✅" else "⚔️")
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text(
-                                        text = task.title,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        maxLines = 1
-                                    )
+                                    Row(
+                                        modifier = Modifier.padding(12.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(task.categoryEmoji, fontSize = 20.sp)
+                                        Spacer(modifier = Modifier.width(10.dp))
+                                        Column {
+                                            Text(
+                                                text = task.title,
+                                                fontWeight = FontWeight.SemiBold,
+                                                style = MaterialTheme.typography.bodyMedium
+                                            )
+                                            Text(
+                                                text = "${task.estimatedMinutes} мин • ${task.priority.titleRu}",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                    }
                                 }
                             }
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(14.dp))
 
-                    OutlinedButton(
+                    TextButton(
                         onClick = { showTaskPickerMenu = false },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp)
+                        modifier = Modifier.align(Alignment.End)
                     ) {
                         Text("Закрыть")
                     }
@@ -500,11 +560,12 @@ fun FocusTimerScreen(
     }
 
     // Modal: Session Completed Victory Dialog
-    if (showCompletedDialog) {
-        val coinsEarned = (totalTimeMinutes / 5).coerceAtLeast(1)
-        val xpEarned = totalTimeMinutes * 3
+    if (timerState.showCompletedDialog) {
+        val completedMins = if (timerState.completedMinutes > 0) timerState.completedMinutes else timerState.totalTimeMinutes
+        val coinsEarned = (completedMins / 5).coerceAtLeast(1)
+        val xpEarned = completedMins * 3
 
-        Dialog(onDismissRequest = { showCompletedDialog = false }) {
+        Dialog(onDismissRequest = onDismissCompletedDialog) {
             Surface(
                 shape = RoundedCornerShape(24.dp),
                 color = MaterialTheme.colorScheme.surface,
@@ -523,7 +584,7 @@ fun FocusTimerScreen(
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "Вы провели $totalTimeMinutes мин в состоянии кристальной концентрации.",
+                        text = "Вы провели $completedMins мин в состоянии кристальной концентрации.",
                         style = MaterialTheme.typography.bodyMedium,
                         textAlign = TextAlign.Center,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -563,10 +624,7 @@ fun FocusTimerScreen(
                     Spacer(modifier = Modifier.height(20.dp))
 
                     Button(
-                        onClick = {
-                            showCompletedDialog = false
-                            timeLeftSeconds = totalTimeMinutes * 60
-                        },
+                        onClick = onDismissCompletedDialog,
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(14.dp)
                     ) {

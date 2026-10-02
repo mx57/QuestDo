@@ -14,7 +14,11 @@ import com.example.data.repository.QuestRepository
 import com.example.util.NotificationHelper
 import com.example.util.QuestAlarmScheduler
 import com.example.util.SoundEffectsHelper
+import com.example.util.SystemAlarmHelper
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.util.Calendar
 
@@ -110,6 +114,11 @@ class QuestViewModel(application: Application) : AndroidViewModel(application) {
 
     val searchQuery = MutableStateFlow("")
     val selectedPriorityFilter = MutableStateFlow<Priority?>(null)
+
+    // Persistent Pomodoro Focus Timer State
+    private val _timerState = MutableStateFlow(FocusTimerUiState())
+    val timerState: StateFlow<FocusTimerUiState> = _timerState.asStateFlow()
+    private var timerJob: Job? = null
 
     fun refreshQuote() {
         val mood = userProfile.value.activeMood
@@ -397,6 +406,153 @@ class QuestViewModel(application: Application) : AndroidViewModel(application) {
             triggerHaptic(HapticType.VICTORY)
             repository.logFocusMinutes(minutes)
         }
+    }
+
+    // ==========================================
+    // POMODORO TIMER METHODS (Screen-Independent)
+    // ==========================================
+
+    fun startTimer() {
+        val current = _timerState.value
+        if (current.isRunning) return
+
+        val durationSeconds = if (current.timeLeftSeconds > 0) current.timeLeftSeconds else current.totalTimeMinutes * 60
+        val targetEnd = System.currentTimeMillis() + (durationSeconds * 1000L)
+
+        _timerState.value = current.copy(
+            isRunning = true,
+            timeLeftSeconds = durationSeconds,
+            targetEndTimeMs = targetEnd
+        )
+
+        // Schedule backup AlarmManager alarm in case system pauses/backgrounds the app
+        QuestAlarmScheduler.scheduleFocusTimerAlarm(
+            getApplication(),
+            durationSeconds,
+            current.spotlightTaskTitle
+        )
+
+        // Start ambient sound if enabled and not muted
+        if (!current.isMuted && current.activeSound != "Тишина 🤫") {
+            soundHelper.startAmbientAudio(current.activeSound)
+        }
+
+        timerJob?.cancel()
+        timerJob = viewModelScope.launch {
+            while (isActive) {
+                delay(400)
+                val snapshot = _timerState.value
+                if (!snapshot.isRunning) break
+
+                val remainingMs = snapshot.targetEndTimeMs - System.currentTimeMillis()
+                val newSeconds = ((remainingMs + 999) / 1000).toInt().coerceAtLeast(0)
+
+                if (newSeconds <= 0) {
+                    // Timer finished successfully!
+                    val sessionMinutes = snapshot.totalTimeMinutes
+                    _timerState.value = snapshot.copy(
+                        timeLeftSeconds = 0,
+                        isRunning = false,
+                        showCompletedDialog = true,
+                        completedMinutes = sessionMinutes
+                    )
+                    soundHelper.stopAmbientAudio()
+                    soundHelper.playVictoryChime()
+                    soundHelper.triggerVibration("VICTORY")
+                    NotificationHelper.showTimerCompleted(
+                        getApplication(),
+                        sessionMinutes,
+                        snapshot.spotlightTaskTitle
+                    )
+                    logFocusSession(sessionMinutes)
+                    QuestAlarmScheduler.cancelFocusTimerAlarm(getApplication())
+                    break
+                } else {
+                    _timerState.value = snapshot.copy(timeLeftSeconds = newSeconds)
+                }
+            }
+        }
+    }
+
+    fun pauseTimer() {
+        timerJob?.cancel()
+        timerJob = null
+        val current = _timerState.value
+        _timerState.value = current.copy(isRunning = false)
+        soundHelper.stopAmbientAudio()
+        QuestAlarmScheduler.cancelFocusTimerAlarm(getApplication())
+    }
+
+    fun resetTimer() {
+        timerJob?.cancel()
+        timerJob = null
+        val current = _timerState.value
+        _timerState.value = current.copy(
+            isRunning = false,
+            timeLeftSeconds = current.totalTimeMinutes * 60,
+            targetEndTimeMs = 0L
+        )
+        soundHelper.stopAmbientAudio()
+        QuestAlarmScheduler.cancelFocusTimerAlarm(getApplication())
+    }
+
+    fun setTimerDuration(minutes: Int) {
+        val current = _timerState.value
+        if (!current.isRunning) {
+            _timerState.value = current.copy(
+                totalTimeMinutes = minutes,
+                timeLeftSeconds = minutes * 60
+            )
+        }
+    }
+
+    fun setSpotlightTask(task: TaskItem?) {
+        val current = _timerState.value
+        val estMinutes = task?.estimatedMinutes
+        val updatedMinutes = if (estMinutes != null && !current.isRunning) estMinutes else current.totalTimeMinutes
+        _timerState.value = current.copy(
+            spotlightTaskId = task?.id,
+            spotlightTaskTitle = task?.title,
+            totalTimeMinutes = updatedMinutes,
+            timeLeftSeconds = if (!current.isRunning) updatedMinutes * 60 else current.timeLeftSeconds
+        )
+    }
+
+    fun setActiveSound(sound: String) {
+        val current = _timerState.value
+        _timerState.value = current.copy(activeSound = sound)
+        if (current.isRunning && !current.isMuted) {
+            if (sound != "Тишина 🤫") {
+                soundHelper.startAmbientAudio(sound)
+            } else {
+                soundHelper.stopAmbientAudio()
+            }
+        }
+    }
+
+    fun toggleTimerMute() {
+        val current = _timerState.value
+        val newMuted = !current.isMuted
+        _timerState.value = current.copy(isMuted = newMuted)
+        if (newMuted) {
+            soundHelper.stopAmbientAudio()
+        } else if (current.isRunning && current.activeSound != "Тишина 🤫") {
+            soundHelper.startAmbientAudio(current.activeSound)
+        }
+    }
+
+    fun dismissTimerCompletedDialog() {
+        val current = _timerState.value
+        _timerState.value = current.copy(
+            showCompletedDialog = false,
+            timeLeftSeconds = current.totalTimeMinutes * 60
+        )
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        timerJob?.cancel()
+        soundHelper.stopAmbientAudio()
     }
 
     fun openAntiProcrastinationDialog() {
