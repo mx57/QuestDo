@@ -288,10 +288,11 @@ fun SettingsScreen(
                             onClick = {
                                 val cal = Calendar.getInstance().apply { add(Calendar.MINUTE, 1) }
                                 SystemAlarmHelper.setSystemAlarm(
-                                    context,
-                                    cal.get(Calendar.HOUR_OF_DAY),
-                                    cal.get(Calendar.MINUTE),
-                                    "⚔️ Тест будильника QuestDo"
+                                    context = context,
+                                    hour = cal.get(Calendar.HOUR_OF_DAY),
+                                    minute = cal.get(Calendar.MINUTE),
+                                    message = "⚔️ Тест будильника QuestDo",
+                                    targetTimestamp = cal.timeInMillis
                                 )
                             },
                             modifier = Modifier.weight(1f),

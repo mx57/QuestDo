@@ -70,4 +70,58 @@ class QuestPlannerUnitTest {
         assertFalse(profile.isArtifactUnlocked("FLOW_FEATHER"))
         assertEquals("Эгида Дисциплины", profile.equippedArtifact?.title)
     }
+
+    @Test
+    fun testNlpParserDateAndAlarmExtraction() {
+        val result1 = com.example.util.LocalNlpParser.parseInput("позвонить коллеге завтра в 18:00")
+        assertEquals("Позвонить коллеге", result1.title)
+        assertNotNull(result1.dueDate)
+
+        val cal = Calendar.getInstance().apply { timeInMillis = result1.dueDate!! }
+        assertEquals(18, cal.get(Calendar.HOUR_OF_DAY))
+        assertEquals(0, cal.get(Calendar.MINUTE))
+        assertEquals(0, cal.get(Calendar.SECOND))
+
+        val result2 = com.example.util.LocalNlpParser.parseInput("выпить воды через 15 минут")
+        assertNotNull(result2.dueDate)
+        assertTrue(result2.dueDate!! > System.currentTimeMillis())
+
+        val result3 = com.example.util.LocalNlpParser.parseInput("! срочно подготовить отчет")
+        assertEquals(com.example.data.model.Priority.CRITICAL, result3.priority)
+    }
+
+    @Test
+    fun testUtcDatePickerToLocalDateConversion() {
+        // Simulating UTC midnight output from DatePicker for Year 2026, Month Oct (9), Day 15
+        val utcCal = Calendar.getInstance(java.util.TimeZone.getTimeZone("UTC")).apply {
+            clear()
+            set(2026, Calendar.OCTOBER, 15, 0, 0, 0)
+        }
+        val selectedUtcMillis = utcCal.timeInMillis
+
+        // Extraction
+        val checkUtc = Calendar.getInstance(java.util.TimeZone.getTimeZone("UTC")).apply {
+            timeInMillis = selectedUtcMillis
+        }
+        val y = checkUtc.get(Calendar.YEAR)
+        val m = checkUtc.get(Calendar.MONTH)
+        val d = checkUtc.get(Calendar.DAY_OF_MONTH)
+
+        // Building local calendar with hour 14:30
+        val localCal = Calendar.getInstance().apply {
+            set(Calendar.YEAR, y)
+            set(Calendar.MONTH, m)
+            set(Calendar.DAY_OF_MONTH, d)
+            set(Calendar.HOUR_OF_DAY, 14)
+            set(Calendar.MINUTE, 30)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }
+
+        assertEquals(2026, localCal.get(Calendar.YEAR))
+        assertEquals(Calendar.OCTOBER, localCal.get(Calendar.MONTH))
+        assertEquals(15, localCal.get(Calendar.DAY_OF_MONTH))
+        assertEquals(14, localCal.get(Calendar.HOUR_OF_DAY))
+        assertEquals(30, localCal.get(Calendar.MINUTE))
+    }
 }

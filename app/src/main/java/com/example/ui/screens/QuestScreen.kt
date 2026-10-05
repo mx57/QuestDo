@@ -2,6 +2,7 @@ package com.example.ui.screens
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -161,6 +162,15 @@ fun QuestScreen(
                 onShuffleQuest = onShuffleQuest,
                 onOpenRoulette = { showRouletteDialog = true },
                 onOpenTemplates = { showTemplatesDialog = true }
+            )
+        }
+
+        // Smart Natural-Language Quick Task & Alarm Input Bar
+        item {
+            SmartQuickTaskInput(
+                onAddTask = { task ->
+                    onSaveTask(task)
+                }
             )
         }
 
@@ -796,6 +806,7 @@ fun QuestTaskCard(
         elevation = CardDefaults.cardElevation(if (task.isCompleted) 1.dp else 3.dp),
         modifier = Modifier
             .fillMaxWidth()
+            .animateContentSize(animationSpec = spring(stiffness = Spring.StiffnessMediumLow))
             .testTag("quest_task_card_${task.id}")
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
@@ -1108,6 +1119,125 @@ fun formatCardDueDate(timestamp: Long): String {
         isToday -> "Сегодня ${timeFormat.format(cal.time)}"
         isTomorrow -> "Завтра ${timeFormat.format(cal.time)}"
         else -> java.text.SimpleDateFormat("d MMM HH:mm", java.util.Locale("ru")).format(cal.time)
+    }
+}
+
+@Composable
+fun SmartQuickTaskInput(
+    onAddTask: (TaskItem) -> Unit
+) {
+    var text by remember { mutableStateOf("") }
+    val parsed = remember(text) {
+        if (text.isNotBlank()) com.example.util.LocalNlpParser.parseInput(text) else null
+    }
+
+    Card(
+        shape = RoundedCornerShape(18.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+        ),
+        modifier = Modifier
+            .fillMaxWidth()
+            .animateContentSize()
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                OutlinedTextField(
+                    value = text,
+                    onValueChange = { text = it },
+                    placeholder = {
+                        Text(
+                            "⚡ Быстрый квест (напр. «Завтра в 18:00 отчет»)",
+                            fontSize = 12.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    },
+                    modifier = Modifier
+                        .weight(1f)
+                        .testTag("quick_add_input"),
+                    singleLine = true,
+                    shape = RoundedCornerShape(14.dp)
+                )
+
+                Spacer(modifier = Modifier.width(8.dp))
+
+                FilledIconButton(
+                    onClick = {
+                        if (text.isNotBlank() && parsed != null) {
+                            val newTask = TaskItem(
+                                title = parsed.title,
+                                dueDate = parsed.dueDate,
+                                priority = parsed.priority,
+                                energyRequired = parsed.energyRequired,
+                                estimatedMinutes = parsed.estimatedMinutes,
+                                inCurrentQuest = true
+                            )
+                            onAddTask(newTask)
+                            text = ""
+                        }
+                    },
+                    enabled = text.isNotBlank(),
+                    shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier
+                        .size(48.dp)
+                        .testTag("quick_add_submit_button")
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = "Добавить квест")
+                }
+            }
+
+            // Live parsed NLP badges preview
+            if (parsed != null && text.isNotBlank()) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (parsed.dueDate != null) {
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = GoldAccent.copy(alpha = 0.25f)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text("⏰", fontSize = 11.sp)
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = formatCardDueDate(parsed.dueDate),
+                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+                        }
+                    }
+
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+                    ) {
+                        Text(
+                            text = "${parsed.priority.titleRu} • ⚡${parsed.energyRequired}",
+                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        )
+                    }
+
+                    Text(
+                        text = "⏱ ${parsed.estimatedMinutes} мин",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
     }
 }
 

@@ -13,6 +13,7 @@ import androidx.activity.viewModels
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -260,112 +261,125 @@ class MainActivity : ComponentActivity() {
                                 .fillMaxSize()
                                 .padding(innerPadding)
                         ) {
-                            when (currentTab) {
-                                 MainTab.QUEST -> QuestScreen(
-                                    currentTasks = currentTasks,
-                                    urgentTasks = urgentTasks,
-                                    activeLevel = activeLevel,
-                                    userProfile = userProfile,
-                                    currentQuote = currentQuote,
-                                    onToggleTask = { viewModel.toggleTask(it) },
-                                    onToggleSubtask = { task, idx -> viewModel.toggleSubtask(task, idx) },
-                                    onAddSubtask = { task, title -> viewModel.addSubtask(task, title) },
-                                    onEditTask = {
-                                        taskToEdit = it
-                                        showTaskEditDialog = true
-                                    },
-                                    onShuffleQuest = { viewModel.shuffleCurrentQuest() },
-                                    onStartFocusOnTask = { task ->
-                                        spotlightFocusTask = task
-                                        viewModel.setSpotlightTask(task)
-                                        currentTab = MainTab.FOCUS
-                                    },
-                                    onOpenSOS = { viewModel.openAntiProcrastinationDialog() },
-                                    onOpenBreathing = { viewModel.openBreathingExerciseDialog() },
-                                    onOpenEveningCheckout = { showEveningCheckoutDialog = true },
-                                    onSelectEnergy = { viewModel.setEnergyLevel(it) },
-                                    onAddNewTask = {
-                                        taskToEdit = null
-                                        showTaskEditDialog = true
-                                    },
-                                    onClaimRewardManual = {
-                                        activeLevel?.let { level ->
-                                            viewModel.claimLevelReward("Победа над уровнем!")
+                            androidx.compose.animation.AnimatedContent(
+                                targetState = currentTab,
+                                transitionSpec = {
+                                    (androidx.compose.animation.fadeIn(animationSpec = androidx.compose.animation.core.tween(200)) +
+                                            androidx.compose.animation.scaleIn(initialScale = 0.98f, animationSpec = androidx.compose.animation.core.tween(200)))
+                                        .togetherWith(
+                                            androidx.compose.animation.fadeOut(animationSpec = androidx.compose.animation.core.tween(150)) +
+                                                    androidx.compose.animation.scaleOut(targetScale = 1.01f, animationSpec = androidx.compose.animation.core.tween(150))
+                                        )
+                                },
+                                label = "mainTabTransition"
+                            ) { tab ->
+                                when (tab) {
+                                    MainTab.QUEST -> QuestScreen(
+                                        currentTasks = currentTasks,
+                                        urgentTasks = urgentTasks,
+                                        activeLevel = activeLevel,
+                                        userProfile = userProfile,
+                                        currentQuote = currentQuote,
+                                        onToggleTask = { viewModel.toggleTask(it) },
+                                        onToggleSubtask = { task, idx -> viewModel.toggleSubtask(task, idx) },
+                                        onAddSubtask = { task, title -> viewModel.addSubtask(task, title) },
+                                        onEditTask = {
+                                            taskToEdit = it
+                                            showTaskEditDialog = true
+                                        },
+                                        onShuffleQuest = { viewModel.shuffleCurrentQuest() },
+                                        onStartFocusOnTask = { task ->
+                                            spotlightFocusTask = task
+                                            viewModel.setSpotlightTask(task)
+                                            currentTab = MainTab.FOCUS
+                                        },
+                                        onOpenSOS = { viewModel.openAntiProcrastinationDialog() },
+                                        onOpenBreathing = { viewModel.openBreathingExerciseDialog() },
+                                        onOpenEveningCheckout = { showEveningCheckoutDialog = true },
+                                        onSelectEnergy = { viewModel.setEnergyLevel(it) },
+                                        onAddNewTask = {
+                                            taskToEdit = null
+                                            showTaskEditDialog = true
+                                        },
+                                        onClaimRewardManual = {
+                                            activeLevel?.let { level ->
+                                                viewModel.claimLevelReward("Победа над уровнем!")
+                                            }
+                                        },
+                                        onSaveTask = { viewModel.saveTask(it) }
+                                    )
+
+                                    MainTab.BACKLOG -> BacklogScreen(
+                                        backlogTasks = backlogTasks,
+                                        staleTasks = staleTasks,
+                                        completedTasks = completedTasks,
+                                        searchQuery = searchQuery,
+                                        onSearchQueryChange = { viewModel.searchQuery.value = it },
+                                        selectedPriority = selectedPriority,
+                                        onSelectPriority = { viewModel.selectedPriorityFilter.value = it },
+                                        onToggleTask = { viewModel.toggleTask(it) },
+                                        onEditTask = {
+                                            taskToEdit = it
+                                            showTaskEditDialog = true
+                                        },
+                                        onDecomposeTask = { viewModel.decomposeTask(it) },
+                                        onStartBossLevel = { title, steps -> viewModel.startBossLevel(title, steps) },
+                                        onOpenBulkImport = { showBulkImportDialog = true },
+                                        onAddNewTask = {
+                                            taskToEdit = null
+                                            showTaskEditDialog = true
+                                        },
+                                        onSaveTask = { viewModel.saveTask(it) }
+                                    )
+
+                                    MainTab.FOCUS -> FocusTimerScreen(
+                                        timerState = timerState,
+                                        spotlightTask = spotlightFocusTask ?: (currentTasks + backlogTasks).find { it.id == timerState.spotlightTaskId },
+                                        currentQuestTasks = currentTasks,
+                                        onStartTimer = { viewModel.startTimer() },
+                                        onPauseTimer = { viewModel.pauseTimer() },
+                                        onResetTimer = { viewModel.resetTimer() },
+                                        onSetDuration = { mins -> viewModel.setTimerDuration(mins) },
+                                        onSetActiveSound = { sound -> viewModel.setActiveSound(sound) },
+                                        onToggleMute = { viewModel.toggleTimerMute() },
+                                        onDismissCompletedDialog = { viewModel.dismissTimerCompletedDialog() },
+                                        onSelectTask = { task ->
+                                            spotlightFocusTask = task
+                                            viewModel.setSpotlightTask(task)
                                         }
-                                    },
-                                    onSaveTask = { viewModel.saveTask(it) }
-                                )
+                                    )
 
-                                MainTab.BACKLOG -> BacklogScreen(
-                                    backlogTasks = backlogTasks,
-                                    staleTasks = staleTasks,
-                                    completedTasks = completedTasks,
-                                    searchQuery = searchQuery,
-                                    onSearchQueryChange = { viewModel.searchQuery.value = it },
-                                    selectedPriority = selectedPriority,
-                                    onSelectPriority = { viewModel.selectedPriorityFilter.value = it },
-                                    onToggleTask = { viewModel.toggleTask(it) },
-                                    onEditTask = {
-                                        taskToEdit = it
-                                        showTaskEditDialog = true
-                                    },
-                                    onDecomposeTask = { viewModel.decomposeTask(it) },
-                                    onStartBossLevel = { title, steps -> viewModel.startBossLevel(title, steps) },
-                                    onOpenBulkImport = { showBulkImportDialog = true },
-                                    onAddNewTask = {
-                                        taskToEdit = null
-                                        showTaskEditDialog = true
-                                    },
-                                    onSaveTask = { viewModel.saveTask(it) }
-                                )
+                                    MainTab.REWARDS -> RewardsScreen(
+                                        userProfile = userProfile,
+                                        customRewards = customRewards,
+                                        badges = badges,
+                                        onRedeemReward = { reward, cb -> viewModel.redeemReward(reward, cb) },
+                                        onAddReward = { viewModel.addReward(it) },
+                                        onDeleteReward = { viewModel.deleteReward(it) },
+                                        onUnlockArtifact = { artifact, cb -> viewModel.unlockArtifact(artifact, cb) },
+                                        onEquipArtifact = { artifact -> viewModel.equipArtifact(artifact) }
+                                    )
 
-                                MainTab.FOCUS -> FocusTimerScreen(
-                                    timerState = timerState,
-                                    spotlightTask = spotlightFocusTask ?: (currentTasks + backlogTasks).find { it.id == timerState.spotlightTaskId },
-                                    currentQuestTasks = currentTasks,
-                                    onStartTimer = { viewModel.startTimer() },
-                                    onPauseTimer = { viewModel.pauseTimer() },
-                                    onResetTimer = { viewModel.resetTimer() },
-                                    onSetDuration = { mins -> viewModel.setTimerDuration(mins) },
-                                    onSetActiveSound = { sound -> viewModel.setActiveSound(sound) },
-                                    onToggleMute = { viewModel.toggleTimerMute() },
-                                    onDismissCompletedDialog = { viewModel.dismissTimerCompletedDialog() },
-                                    onSelectTask = { task ->
-                                        spotlightFocusTask = task
-                                        viewModel.setSpotlightTask(task)
-                                    }
-                                )
+                                    MainTab.CALENDAR -> CalendarStatsScreen(
+                                        userProfile = userProfile,
+                                        allTasks = (currentTasks + backlogTasks + completedTasks).distinctBy { it.id }
+                                    )
 
-                                MainTab.REWARDS -> RewardsScreen(
-                                    userProfile = userProfile,
-                                    customRewards = customRewards,
-                                    badges = badges,
-                                    onRedeemReward = { reward, cb -> viewModel.redeemReward(reward, cb) },
-                                    onAddReward = { viewModel.addReward(it) },
-                                    onDeleteReward = { viewModel.deleteReward(it) },
-                                    onUnlockArtifact = { artifact, cb -> viewModel.unlockArtifact(artifact, cb) },
-                                    onEquipArtifact = { artifact -> viewModel.equipArtifact(artifact) }
-                                )
-
-                                MainTab.CALENDAR -> CalendarStatsScreen(
-                                    userProfile = userProfile,
-                                    allTasks = (currentTasks + backlogTasks + completedTasks).distinctBy { it.id }
-                                )
-
-                                MainTab.SETTINGS -> SettingsScreen(
-                                    userProfile = userProfile,
-                                    onSetMood = { viewModel.setMood(it) },
-                                    onSetThemeMode = { viewModel.setThemeMode(it) },
-                                    onSetTasksPerQuest = { viewModel.setTasksPerQuest(it) },
-                                    onSetAppIconStyle = { viewModel.setAppIconStyle(it) },
-                                    onSetNotificationTone = { viewModel.setNotificationTone(it) },
-                                    onSetSoundEffects = { viewModel.setSoundEffectsEnabled(it) },
-                                    onSetHaptics = { viewModel.setHapticsEnabled(it) },
-                                    onSetNotifications = { viewModel.setNotificationsEnabled(it) },
-                                    onSetDailyReminderTime = { h, m -> viewModel.setDailyReminderTime(h, m) },
-                                    onTestNotification = { viewModel.triggerTestNotification() },
-                                    onTestAlarm = { viewModel.triggerTestAlarm(10) }
-                                )
+                                    MainTab.SETTINGS -> SettingsScreen(
+                                        userProfile = userProfile,
+                                        onSetMood = { viewModel.setMood(it) },
+                                        onSetThemeMode = { viewModel.setThemeMode(it) },
+                                        onSetTasksPerQuest = { viewModel.setTasksPerQuest(it) },
+                                        onSetAppIconStyle = { viewModel.setAppIconStyle(it) },
+                                        onSetNotificationTone = { viewModel.setNotificationTone(it) },
+                                        onSetSoundEffects = { viewModel.setSoundEffectsEnabled(it) },
+                                        onSetHaptics = { viewModel.setHapticsEnabled(it) },
+                                        onSetNotifications = { viewModel.setNotificationsEnabled(it) },
+                                        onSetDailyReminderTime = { h, m -> viewModel.setDailyReminderTime(h, m) },
+                                        onTestNotification = { viewModel.triggerTestNotification() },
+                                        onTestAlarm = { viewModel.triggerTestAlarm(10) }
+                                    )
+                                }
                             }
                         }
                     }

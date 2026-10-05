@@ -593,15 +593,36 @@ fun TaskEditDialog(
 
     // Material 3 Date Picker Dialog
     if (showDatePicker) {
+        val initialUtcDateMillis = remember(dueDate) {
+            val localCal = Calendar.getInstance().apply {
+                if (dueDate != null) timeInMillis = dueDate!!
+            }
+            Calendar.getInstance(TimeZone.getTimeZone("UTC")).apply {
+                clear()
+                set(
+                    localCal.get(Calendar.YEAR),
+                    localCal.get(Calendar.MONTH),
+                    localCal.get(Calendar.DAY_OF_MONTH)
+                )
+            }.timeInMillis
+        }
         val datePickerState = rememberDatePickerState(
-            initialSelectedDateMillis = dueDate ?: System.currentTimeMillis()
+            initialSelectedDateMillis = initialUtcDateMillis
         )
         DatePickerDialog(
             onDismissRequest = { showDatePicker = false },
             confirmButton = {
                 TextButton(onClick = {
                     showDatePicker = false
-                    val selectedDate = datePickerState.selectedDateMillis ?: System.currentTimeMillis()
+                    val selectedUtcDate = datePickerState.selectedDateMillis ?: initialUtcDateMillis
+
+                    // Extract exact year, month, day in UTC to avoid timezone shift
+                    val utcCal = Calendar.getInstance(TimeZone.getTimeZone("UTC")).apply {
+                        timeInMillis = selectedUtcDate
+                    }
+                    val selYear = utcCal.get(Calendar.YEAR)
+                    val selMonth = utcCal.get(Calendar.MONTH)
+                    val selDay = utcCal.get(Calendar.DAY_OF_MONTH)
 
                     // Now open TimePickerDialog
                     val initialCal = Calendar.getInstance().apply {
@@ -611,10 +632,13 @@ fun TaskEditDialog(
                         context,
                         { _, hourOfDay, minute ->
                             val finalCal = Calendar.getInstance().apply {
-                                timeInMillis = selectedDate
+                                set(Calendar.YEAR, selYear)
+                                set(Calendar.MONTH, selMonth)
+                                set(Calendar.DAY_OF_MONTH, selDay)
                                 set(Calendar.HOUR_OF_DAY, hourOfDay)
                                 set(Calendar.MINUTE, minute)
                                 set(Calendar.SECOND, 0)
+                                set(Calendar.MILLISECOND, 0)
                             }
                             dueDate = finalCal.timeInMillis
                         },

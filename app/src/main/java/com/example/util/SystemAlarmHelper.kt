@@ -21,7 +21,9 @@ object SystemAlarmHelper {
         minute: Int,
         message: String,
         skipUi: Boolean = false,
-        vibrate: Boolean = true
+        vibrate: Boolean = true,
+        days: ArrayList<Int>? = null,
+        targetTimestamp: Long? = null
     ): Boolean {
         val intent = Intent(AlarmClock.ACTION_SET_ALARM).apply {
             putExtra(AlarmClock.EXTRA_HOUR, hour)
@@ -29,14 +31,33 @@ object SystemAlarmHelper {
             putExtra(AlarmClock.EXTRA_MESSAGE, message)
             putExtra(AlarmClock.EXTRA_VIBRATE, vibrate)
             putExtra(AlarmClock.EXTRA_SKIP_UI, skipUi)
+            if (days != null && days.isNotEmpty()) {
+                putIntegerArrayListExtra(AlarmClock.EXTRA_DAYS, days)
+            }
             flags = Intent.FLAG_ACTIVITY_NEW_TASK
         }
         return try {
             context.startActivity(intent)
-            val timeFormatted = "%02d:%02d".format(hour, minute)
+            val dateLabel = if (targetTimestamp != null) {
+                val cal = Calendar.getInstance().apply { timeInMillis = targetTimestamp }
+                val now = Calendar.getInstance()
+                val isToday = cal.get(Calendar.DAY_OF_YEAR) == now.get(Calendar.DAY_OF_YEAR) &&
+                        cal.get(Calendar.YEAR) == now.get(Calendar.YEAR)
+                val tomorrow = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, 1) }
+                val isTomorrow = cal.get(Calendar.DAY_OF_YEAR) == tomorrow.get(Calendar.DAY_OF_YEAR) &&
+                        cal.get(Calendar.YEAR) == tomorrow.get(Calendar.YEAR)
+                val timeStr = "%02d:%02d".format(hour, minute)
+                when {
+                    isToday -> "сегодня в $timeStr"
+                    isTomorrow -> "завтра в $timeStr"
+                    else -> java.text.SimpleDateFormat("d MMMM в HH:mm", java.util.Locale("ru")).format(cal.time)
+                }
+            } else {
+                "%02d:%02d".format(hour, minute)
+            }
             Toast.makeText(
                 context,
-                "⏰ Будильник установлен в системных часах на $timeFormatted",
+                "⏰ Будильник установлен в системных часах на $dateLabel",
                 Toast.LENGTH_SHORT
             ).show()
             true
@@ -66,10 +87,30 @@ object SystemAlarmHelper {
         message: String,
         skipUi: Boolean = false
     ): Boolean {
+        if (timestampMs <= System.currentTimeMillis()) {
+            Toast.makeText(context, "Указанное время напоминания уже прошло", Toast.LENGTH_SHORT).show()
+            return false
+        }
         val calendar = Calendar.getInstance().apply { timeInMillis = timestampMs }
         val hour = calendar.get(Calendar.HOUR_OF_DAY)
         val minute = calendar.get(Calendar.MINUTE)
-        return setSystemAlarm(context, hour, minute, message, skipUi)
+        val dayOfWeek = calendar.get(Calendar.DAY_OF_WEEK)
+
+        val now = Calendar.getInstance()
+        val isToday = calendar.get(Calendar.YEAR) == now.get(Calendar.YEAR) &&
+                calendar.get(Calendar.DAY_OF_YEAR) == now.get(Calendar.DAY_OF_YEAR)
+
+        val daysList = if (!isToday) arrayListOf(dayOfWeek) else null
+
+        return setSystemAlarm(
+            context = context,
+            hour = hour,
+            minute = minute,
+            message = message,
+            skipUi = skipUi,
+            days = daysList,
+            targetTimestamp = timestampMs
+        )
     }
 
     /**

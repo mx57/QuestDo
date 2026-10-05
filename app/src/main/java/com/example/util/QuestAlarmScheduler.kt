@@ -55,12 +55,9 @@ object QuestAlarmScheduler {
         )
 
         try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                if (alarmManager.canScheduleExactAlarms()) {
-                    alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, dueDate, pendingIntent)
-                } else {
-                    alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, dueDate, pendingIntent)
-                }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                val alarmClockInfo = AlarmManager.AlarmClockInfo(dueDate, pendingIntent)
+                alarmManager.setAlarmClock(alarmClockInfo, pendingIntent)
             } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                 alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, dueDate, pendingIntent)
             } else {
@@ -68,7 +65,16 @@ object QuestAlarmScheduler {
             }
             Log.d("QuestAlarmScheduler", "Alarm scheduled for task ${task.id} at $dueDate")
         } catch (e: Exception) {
-            Log.e("QuestAlarmScheduler", "Failed to schedule alarm: ${e.message}")
+            Log.w("QuestAlarmScheduler", "setAlarmClock failed, falling back to setAndAllowWhileIdle: ${e.message}")
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, dueDate, pendingIntent)
+                } else {
+                    alarmManager.set(AlarmManager.RTC_WAKEUP, dueDate, pendingIntent)
+                }
+            } catch (fallbackEx: Exception) {
+                Log.e("QuestAlarmScheduler", "Failed to schedule alarm completely: ${fallbackEx.message}")
+            }
         }
     }
 
