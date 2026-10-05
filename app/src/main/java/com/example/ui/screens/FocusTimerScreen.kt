@@ -73,6 +73,11 @@ fun FocusTimerScreen(
         animationSpec = infiniteRepeatable(tween(350, easing = FastOutSlowInEasing), RepeatMode.Reverse),
         label = "w3"
     )
+    val breathingAura by infiniteTransition.animateFloat(
+        initialValue = 0.96f, targetValue = 1.07f,
+        animationSpec = infiniteRepeatable(tween(2800, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+        label = "timerAura"
+    )
 
     Column(
         modifier = Modifier
@@ -157,6 +162,14 @@ fun FocusTimerScreen(
                 val centerOffset = Offset(size.width / 2, size.height / 2)
 
                 // Background Track
+                if (timerState.isRunning) {
+                    drawCircle(
+                        color = primaryColor.copy(alpha = 0.12f),
+                        radius = radius * breathingAura,
+                        center = centerOffset
+                    )
+                }
+
                 drawCircle(
                     color = trackColor,
                     radius = radius,

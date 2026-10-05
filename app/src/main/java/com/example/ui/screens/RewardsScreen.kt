@@ -20,9 +20,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
-import com.example.data.model.BadgeAchievement
-import com.example.data.model.CustomReward
-import com.example.data.model.UserProfile
+import com.example.data.model.*
 import com.example.ui.theme.GoldAccent
 import com.example.ui.theme.StreakFire
 import com.example.ui.theme.XpPurple
@@ -35,11 +33,13 @@ fun RewardsScreen(
     badges: List<BadgeAchievement>,
     onRedeemReward: (CustomReward, (Boolean) -> Unit) -> Unit,
     onAddReward: (CustomReward) -> Unit,
-    onDeleteReward: (CustomReward) -> Unit
+    onDeleteReward: (CustomReward) -> Unit,
+    onUnlockArtifact: (HeroArtifact, (Boolean) -> Unit) -> Unit = { _, _ -> },
+    onEquipArtifact: (HeroArtifact) -> Unit = {}
 ) {
     var showAddRewardDialog by remember { mutableStateOf(false) }
     var snackbarMessage by remember { mutableStateOf<String?>(null) }
-    var selectedTab by remember { mutableIntStateOf(0) } // 0: Награды, 1: Достижения
+    var selectedTab by remember { mutableIntStateOf(0) } // 0: Награды, 1: Реликвии, 2: Достижения
 
     Scaffold(
         snackbarHost = {
@@ -157,12 +157,17 @@ fun RewardsScreen(
                     Tab(
                         selected = selectedTab == 0,
                         onClick = { selectedTab = 0 },
-                        text = { Text("Магазин наград 🎁", fontWeight = FontWeight.Bold) }
+                        text = { Text("Награды 🎁", fontWeight = FontWeight.Bold) }
                     )
                     Tab(
                         selected = selectedTab == 1,
                         onClick = { selectedTab = 1 },
-                        text = { Text("Достижения 🎖️", fontWeight = FontWeight.Bold) }
+                        text = { Text("Реликвии 🔮", fontWeight = FontWeight.Bold) }
+                    )
+                    Tab(
+                        selected = selectedTab == 2,
+                        onClick = { selectedTab = 2 },
+                        text = { Text("Ачивки 🎖️", fontWeight = FontWeight.Bold) }
                     )
                 }
             }
@@ -253,6 +258,134 @@ fun RewardsScreen(
                                         tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                                         modifier = Modifier.size(20.dp)
                                     )
+                                }
+                            }
+                        }
+                    }
+                }
+            } else if (selectedTab == 1) {
+                // Artifacts & Relics
+                item {
+                    Text(
+                        text = "Экипируйте мистические артефакты, дающие пассивные усиления в ваших приключениях:",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                items(HeroArtifactCatalog.ALL_ARTIFACTS, key = { it.id }) { artifact ->
+                    val isUnlocked = userProfile.isArtifactUnlocked(artifact.id)
+                    val isEquipped = userProfile.equippedArtifactId == artifact.id
+                    val canAfford = userProfile.coins >= artifact.costCoins
+                    val levelSufficient = userProfile.level >= artifact.levelRequired
+
+                    Card(
+                        shape = RoundedCornerShape(18.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = if (isEquipped) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f) else MaterialTheme.colorScheme.surface
+                        ),
+                        elevation = CardDefaults.cardElevation(if (isEquipped) 4.dp else 2.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("artifact_item_${artifact.id}")
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(artifact.iconEmoji, fontSize = 34.sp)
+                            Spacer(modifier = Modifier.width(14.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(
+                                        text = artifact.title,
+                                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold)
+                                    )
+                                    if (isEquipped) {
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Surface(
+                                            shape = RoundedCornerShape(6.dp),
+                                            color = GoldAccent
+                                        ) {
+                                            Text(
+                                                text = "НАДЕТО",
+                                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Black),
+                                                color = Color.Black,
+                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                                Text(
+                                    text = artifact.description,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = "✨ " + artifact.perkRu,
+                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Medium),
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.width(8.dp))
+
+                            if (isEquipped) {
+                                FilledTonalButton(
+                                    onClick = { /* Already equipped */ },
+                                    enabled = false,
+                                    shape = RoundedCornerShape(12.dp)
+                                ) {
+                                    Text("Активен")
+                                }
+                            } else if (isUnlocked) {
+                                Button(
+                                    onClick = { onEquipArtifact(artifact) },
+                                    shape = RoundedCornerShape(12.dp),
+                                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                                ) {
+                                    Text("Надеть")
+                                }
+                            } else {
+                                if (!levelSufficient) {
+                                    Surface(
+                                        shape = RoundedCornerShape(10.dp),
+                                        color = MaterialTheme.colorScheme.surfaceVariant
+                                    ) {
+                                        Text(
+                                            text = "Ур. ${artifact.levelRequired} 🔒",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                                        )
+                                    }
+                                } else {
+                                    Button(
+                                        onClick = {
+                                            onUnlockArtifact(artifact) { success ->
+                                                snackbarMessage = if (success) {
+                                                    "🔮 Артефакт «${artifact.title}» разблокирован!"
+                                                } else {
+                                                    "Недостаточно монет для разблокировки реликвии!"
+                                                }
+                                            }
+                                        },
+                                        enabled = canAfford,
+                                        shape = RoundedCornerShape(12.dp),
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = GoldAccent,
+                                            disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant
+                                        )
+                                    ) {
+                                        Text(
+                                            text = "${artifact.costCoins} 🪙",
+                                            color = if (canAfford) Color.Black else MaterialTheme.colorScheme.onSurfaceVariant,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
                                 }
                             }
                         }

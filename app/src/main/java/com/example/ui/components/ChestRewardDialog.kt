@@ -16,8 +16,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -40,8 +42,29 @@ fun ChestRewardDialog(
     var isChestOpened by remember { mutableStateOf(false) }
     var selectedRewardTitle by remember { mutableStateOf("15 минут отдыха и чашка чая") }
 
+    val infiniteTransition = rememberInfiniteTransition(label = "sunburst")
+    val rayRotation by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 8000, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "rays"
+    )
+
+    val chestPulse by infiniteTransition.animateFloat(
+        initialValue = 0.95f,
+        targetValue = 1.05f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 900, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "pulse"
+    )
+
     val scale by animateFloatAsState(
-        targetValue = if (isChestOpened) 1.15f else 1.0f,
+        targetValue = if (isChestOpened) 1.2f else chestPulse,
         animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow),
         label = "chestBounce"
     )
@@ -86,22 +109,51 @@ fun ChestRewardDialog(
                 // Interactive Chest Graphic
                 Box(
                     modifier = Modifier
-                        .size(110.dp)
-                        .scale(scale)
-                        .clip(CircleShape)
-                        .background(
-                            Brush.radialGradient(
-                                colors = listOf(GoldAccent.copy(alpha = 0.3f), Color.Transparent)
-                            )
-                        )
-                        .clickable { isChestOpened = true }
-                        .padding(8.dp),
+                        .size(140.dp)
+                        .scale(scale),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(
-                        text = if (isChestOpened) "✨💎✨" else "🎁",
-                        fontSize = if (isChestOpened) 42.sp else 54.sp
-                    )
+                    if (isChestOpened) {
+                        androidx.compose.foundation.Canvas(modifier = Modifier.fillMaxSize()) {
+                            val center = Offset(size.width / 2f, size.height / 2f)
+                            val rayCount = 12
+                            val sweepAngle = 360f / rayCount
+                            rotate(degrees = rayRotation, pivot = center) {
+                                for (i in 0 until rayCount step 2) {
+                                    drawArc(
+                                        color = GoldAccent.copy(alpha = 0.22f),
+                                        startAngle = i * sweepAngle,
+                                        sweepAngle = sweepAngle * 0.7f,
+                                        useCenter = true,
+                                        topLeft = Offset.Zero,
+                                        size = size
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .size(110.dp)
+                            .clip(CircleShape)
+                            .background(
+                                Brush.radialGradient(
+                                    colors = listOf(
+                                        if (isChestOpened) GoldAccent.copy(alpha = 0.45f) else GoldAccent.copy(alpha = 0.25f),
+                                        Color.Transparent
+                                    )
+                                )
+                            )
+                            .clickable { isChestOpened = true }
+                            .padding(8.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = if (isChestOpened) "✨💎✨" else "🎁",
+                            fontSize = if (isChestOpened) 42.sp else 54.sp
+                        )
+                    }
                 }
 
                 if (!isChestOpened) {

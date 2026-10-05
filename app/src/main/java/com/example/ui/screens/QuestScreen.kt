@@ -2,6 +2,7 @@ package com.example.ui.screens
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -17,8 +18,10 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
@@ -30,6 +33,7 @@ import com.example.ui.components.*
 import com.example.ui.theme.GoldAccent
 import com.example.ui.theme.StreakFire
 import com.example.ui.theme.XpPurple
+import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -50,8 +54,12 @@ fun QuestScreen(
     onOpenEveningCheckout: () -> Unit,
     onSelectEnergy: (Int) -> Unit,
     onAddNewTask: () -> Unit,
-    onClaimRewardManual: () -> Unit
+    onClaimRewardManual: () -> Unit,
+    onSaveTask: (TaskItem) -> Unit = {}
 ) {
+    var showRouletteDialog by remember { mutableStateOf(false) }
+    var showTemplatesDialog by remember { mutableStateOf(false) }
+
     val totalInQuest = currentTasks.size
     val completedInQuest = currentTasks.count { it.isCompleted }
     val questProgress = if (totalInQuest > 0) completedInQuest.toFloat() / totalInQuest.toFloat() else 0f
@@ -150,7 +158,9 @@ fun QuestScreen(
                 progress = questProgress,
                 allCompleted = allCompleted,
                 onClaimReward = onClaimRewardManual,
-                onShuffleQuest = onShuffleQuest
+                onShuffleQuest = onShuffleQuest,
+                onOpenRoulette = { showRouletteDialog = true },
+                onOpenTemplates = { showTemplatesDialog = true }
             )
         }
 
@@ -246,6 +256,28 @@ fun QuestScreen(
             }
         }
     }
+
+    if (showRouletteDialog) {
+        QuestRouletteDialog(
+            tasks = currentTasks.filter { !it.isCompleted },
+            onSelectTaskForFocus = { task ->
+                onStartFocusOnTask(task)
+                showRouletteDialog = false
+            },
+            onDismiss = { showRouletteDialog = false }
+        )
+    }
+
+    if (showTemplatesDialog) {
+        QuickTemplatesDialog(
+            onSelectTemplate = { task ->
+                val shouldAddToQuest = currentTasks.size < userProfile.tasksPerQuest
+                onSaveTask(task.copy(inCurrentQuest = shouldAddToQuest))
+                showTemplatesDialog = false
+            },
+            onDismiss = { showTemplatesDialog = false }
+        )
+    }
 }
 
 @Composable
@@ -254,6 +286,23 @@ fun HeroHeaderCard(
     onOpenBreathing: () -> Unit,
     onOpenEveningCheckout: () -> Unit
 ) {
+    val infiniteTransition = rememberInfiniteTransition(label = "hudAnim")
+    val flameScale by infiniteTransition.animateFloat(
+        initialValue = 0.94f,
+        targetValue = 1.14f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 650, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "flamePulse"
+    )
+
+    val animatedXpProgress by animateFloatAsState(
+        targetValue = userProfile.xpProgress,
+        animationSpec = spring(stiffness = Spring.StiffnessLow),
+        label = "xpAnim"
+    )
+
     Card(
         shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(
@@ -289,11 +338,13 @@ fun HeroHeaderCard(
                             text = userProfile.heroName,
                             style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
                         )
-                        Text(
-                            text = "Ур. ${userProfile.level} • ${userProfile.heroTitle}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.primary
-                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = "Ур. ${userProfile.level} • ${userProfile.heroTitle}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
                     }
                 }
 
@@ -302,7 +353,7 @@ fun HeroHeaderCard(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    // Streak Badge
+                    // Streak Badge with Pulsing Flame
                     Surface(
                         shape = RoundedCornerShape(12.dp),
                         color = StreakFire.copy(alpha = 0.15f)
@@ -311,7 +362,11 @@ fun HeroHeaderCard(
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text("🔥", fontSize = 14.sp)
+                            Text(
+                                text = "🔥",
+                                fontSize = 14.sp,
+                                modifier = Modifier.scale(flameScale)
+                            )
                             Spacer(modifier = Modifier.width(3.dp))
                             Text(
                                 text = "${userProfile.streakDays}",
@@ -353,6 +408,37 @@ fun HeroHeaderCard(
                 }
             }
 
+            // Equipped Artifact status chip if present
+            userProfile.equippedArtifact?.let { relic ->
+                Spacer(modifier = Modifier.height(10.dp))
+                Surface(
+                    shape = RoundedCornerShape(10.dp),
+                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(relic.iconEmoji, fontSize = 15.sp)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Реликвия: ${relic.title}",
+                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                        Spacer(modifier = Modifier.weight(1f))
+                        Text(
+                            text = relic.perkRu,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+            }
+
             Spacer(modifier = Modifier.height(12.dp))
 
             // XP Bar to Next Level
@@ -376,7 +462,7 @@ fun HeroHeaderCard(
             Spacer(modifier = Modifier.height(6.dp))
 
             LinearProgressIndicator(
-                progress = { userProfile.xpProgress },
+                progress = { animatedXpProgress },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(8.dp)
@@ -508,15 +594,36 @@ fun QuestStatusBanner(
     progress: Float,
     allCompleted: Boolean,
     onClaimReward: () -> Unit,
-    onShuffleQuest: () -> Unit
+    onShuffleQuest: () -> Unit,
+    onOpenRoulette: () -> Unit = {},
+    onOpenTemplates: () -> Unit = {}
 ) {
+    val animatedProgress by animateFloatAsState(
+        targetValue = progress,
+        animationSpec = spring(stiffness = Spring.StiffnessLow),
+        label = "questProgAnim"
+    )
+
+    val infiniteTransition = rememberInfiniteTransition(label = "bannerPulse")
+    val pulseScale by infiniteTransition.animateFloat(
+        initialValue = 0.98f,
+        targetValue = 1.02f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 800, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "bannerPulse"
+    )
+
     Card(
         shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(
             containerColor = if (allCompleted) GoldAccent.copy(alpha = 0.2f) else MaterialTheme.colorScheme.surface
         ),
         elevation = CardDefaults.cardElevation(if (allCompleted) 6.dp else 2.dp),
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(if (allCompleted) Modifier.scale(pulseScale) else Modifier)
     ) {
         Column(modifier = Modifier.padding(18.dp)) {
             Row(
@@ -524,7 +631,7 @@ fun QuestStatusBanner(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Column {
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = activeLevel?.title ?: "Текущий Уровень",
                         style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Black)
@@ -553,7 +660,7 @@ fun QuestStatusBanner(
             Spacer(modifier = Modifier.height(10.dp))
 
             LinearProgressIndicator(
-                progress = { progress },
+                progress = { animatedProgress },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(10.dp)
@@ -561,6 +668,59 @@ fun QuestStatusBanner(
                 color = if (allCompleted) GoldAccent else MaterialTheme.colorScheme.primary,
                 trackColor = MaterialTheme.colorScheme.surfaceVariant
             )
+
+            // Fast Actions Bar: Roulette & Templates
+            if (!allCompleted) {
+                Spacer(modifier = Modifier.height(12.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f),
+                        modifier = Modifier
+                            .weight(1f)
+                            .clickable { onOpenRoulette() }
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center
+                        ) {
+                            Text("🎰", fontSize = 14.sp)
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "Рулетка задач",
+                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                        }
+                    }
+
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.6f),
+                        modifier = Modifier
+                            .weight(1f)
+                            .clickable { onOpenTemplates() }
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center
+                        ) {
+                            Text("⚡", fontSize = 14.sp)
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "Шаблоны",
+                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                color = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+                        }
+                    }
+                }
+            }
 
             if (allCompleted) {
                 Spacer(modifier = Modifier.height(14.dp))
@@ -594,6 +754,33 @@ fun QuestTaskCard(
     var newSubtaskInput by remember { mutableStateOf("") }
     val subtasks = task.getSubtasksList()
 
+    var showXpPop by remember { mutableStateOf(false) }
+
+    LaunchedEffect(task.isCompleted) {
+        if (task.isCompleted) {
+            showXpPop = true
+            delay(1300)
+            showXpPop = false
+        }
+    }
+
+    val checkScale by animateFloatAsState(
+        targetValue = if (task.isCompleted) 1.25f else 1.0f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+        label = "checkScale"
+    )
+
+    val popOffsetY by animateFloatAsState(
+        targetValue = if (showXpPop) -28f else 0f,
+        animationSpec = tween(durationMillis = 1100, easing = LinearOutSlowInEasing),
+        label = "popY"
+    )
+    val popAlpha by animateFloatAsState(
+        targetValue = if (showXpPop) 1f else 0f,
+        animationSpec = tween(durationMillis = 1100),
+        label = "popAlpha"
+    )
+
     val cardColor by animateColorAsState(
         targetValue = if (task.isCompleted) {
             MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
@@ -616,19 +803,39 @@ fun QuestTaskCard(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.Top
             ) {
-                // Checkbox
-                IconButton(
-                    onClick = onToggle,
-                    modifier = Modifier
-                        .size(40.dp)
-                        .testTag("toggle_task_${task.id}")
-                ) {
-                    Icon(
-                        imageVector = if (task.isCompleted) Icons.Default.CheckCircle else Icons.Outlined.Circle,
-                        contentDescription = "Выполнить задачу",
-                        tint = if (task.isCompleted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(28.dp)
-                    )
+                // Checkbox with XP Pop and spring scale
+                Box(contentAlignment = Alignment.TopCenter) {
+                    IconButton(
+                        onClick = onToggle,
+                        modifier = Modifier
+                            .size(40.dp)
+                            .scale(checkScale)
+                            .testTag("toggle_task_${task.id}")
+                    ) {
+                        Icon(
+                            imageVector = if (task.isCompleted) Icons.Default.CheckCircle else Icons.Outlined.Circle,
+                            contentDescription = "Выполнить задачу",
+                            tint = if (task.isCompleted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(28.dp)
+                        )
+                    }
+
+                    if (popAlpha > 0.05f) {
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = GoldAccent,
+                            modifier = Modifier
+                                .offset(y = popOffsetY.dp)
+                                .graphicsLayer { alpha = popAlpha }
+                        ) {
+                            Text(
+                                text = "+25 XP 🪙+5",
+                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Black),
+                                color = Color.Black,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
                 }
 
                 Spacer(modifier = Modifier.width(8.dp))
@@ -748,7 +955,7 @@ fun QuestTaskCard(
                     ) {
                         Icon(
                             Icons.Default.Timer,
-                            contentDescription = "Фокус-режим",
+                            contentDescription = "Фокус на задаче",
                             tint = MaterialTheme.colorScheme.primary
                         )
                     }

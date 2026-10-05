@@ -16,7 +16,7 @@ import com.example.data.model.*
         CustomReward::class,
         BadgeAchievement::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = false
 )
 @TypeConverters(Converters::class)

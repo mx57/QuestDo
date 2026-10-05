@@ -37,11 +37,20 @@ data class UserProfile(
     val dailyReminderMinute: Int = 0,
     val totalQuestsCompleted: Int = 0,
     val totalTasksCompleted: Int = 0,
-    val totalFocusMinutes: Int = 0
+    val totalFocusMinutes: Int = 0,
+    val equippedArtifactId: String = "SHIELD_AEGIS",
+    val unlockedArtifactIdsRaw: String = "SHIELD_AEGIS"
 ) {
     val xpNeededForNextLevel: Int
         get() = level * 200
 
     val xpProgress: Float
         get() = (xp % xpNeededForNextLevel).toFloat() / xpNeededForNextLevel.toFloat().coerceAtLeast(1f)
+
+    fun isArtifactUnlocked(artifactId: String): Boolean {
+        return unlockedArtifactIdsRaw.split(",").map { it.trim() }.contains(artifactId)
+    }
+
+    val equippedArtifact: HeroArtifact?
+        get() = HeroArtifactCatalog.getById(equippedArtifactId)
 }

@@ -52,4 +52,22 @@ class QuestPlannerUnitTest {
         val nextDay = cal.get(Calendar.DAY_OF_YEAR)
         assertEquals((originalDay % 365) + 1, (nextDay - 1) % 365 + 1)
     }
+
+    @Test
+    fun testHeroArtifactsCatalogAndProfileEquipping() {
+        val all = com.example.data.model.HeroArtifactCatalog.ALL_ARTIFACTS
+        assertTrue(all.isNotEmpty())
+        val aegis = com.example.data.model.HeroArtifactCatalog.getById("SHIELD_AEGIS")
+        assertNotNull(aegis)
+        assertEquals("Эгида Дисциплины", aegis!!.title)
+
+        val profile = com.example.data.model.UserProfile(
+            equippedArtifactId = "SHIELD_AEGIS",
+            unlockedArtifactIdsRaw = "SHIELD_AEGIS,CHRONO_TITAN"
+        )
+        assertTrue(profile.isArtifactUnlocked("SHIELD_AEGIS"))
+        assertTrue(profile.isArtifactUnlocked("CHRONO_TITAN"))
+        assertFalse(profile.isArtifactUnlocked("FLOW_FEATHER"))
+        assertEquals("Эгида Дисциплины", profile.equippedArtifact?.title)
+    }
 }

@@ -257,6 +257,26 @@ class QuestViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun unlockArtifact(artifact: HeroArtifact, onResult: (Boolean) -> Unit) {
+        viewModelScope.launch {
+            val success = repository.unlockArtifact(artifact.id, artifact.costCoins)
+            if (success) {
+                triggerHaptic(HapticType.VICTORY)
+                if (userProfile.value.soundEffectsEnabled) {
+                    soundHelper.playVictoryChime()
+                }
+            }
+            onResult(success)
+        }
+    }
+
+    fun equipArtifact(artifact: HeroArtifact) {
+        viewModelScope.launch {
+            triggerHaptic(HapticType.MEDIUM)
+            repository.equipArtifact(artifact.id)
+        }
+    }
+
     fun addReward(reward: CustomReward) {
         viewModelScope.launch {
             repository.addCustomReward(reward)

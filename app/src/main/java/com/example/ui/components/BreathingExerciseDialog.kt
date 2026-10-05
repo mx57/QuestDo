@@ -89,20 +89,36 @@ fun BreathingExerciseDialog(
 
                 Box(
                     modifier = Modifier
-                        .size(180.dp),
+                        .size(200.dp),
                     contentAlignment = Alignment.Center
                 ) {
+                    // Outer pulsating ripple 2
+                    Box(
+                        modifier = Modifier
+                            .size(175.dp)
+                            .scale(animatedScale * 1.15f)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f))
+                    )
+                    // Outer pulsating ripple 1
+                    Box(
+                        modifier = Modifier
+                            .size(150.dp)
+                            .scale(animatedScale * 1.07f)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.secondary.copy(alpha = 0.22f))
+                    )
                     // Glowing breathing bubble
                     Box(
                         modifier = Modifier
-                            .size(130.dp)
+                            .size(125.dp)
                             .scale(animatedScale)
                             .clip(CircleShape)
                             .background(
                                 Brush.radialGradient(
                                     colors = listOf(
-                                        MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
-                                        MaterialTheme.colorScheme.secondary.copy(alpha = 0.3f)
+                                        MaterialTheme.colorScheme.primary,
+                                        MaterialTheme.colorScheme.secondary.copy(alpha = 0.85f)
                                     )
                                 )
                             ),

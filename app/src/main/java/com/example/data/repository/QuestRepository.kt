@@ -209,10 +209,22 @@ class QuestRepository(
 
         if (newStatus) {
             val profile = userProfileDao.getUserProfile().firstOrNull() ?: UserProfile()
+            var earnedCoins = 5
+            var earnedXp = 25
+            
+            // Artifact bonus perks
+            if (profile.equippedArtifactId == "FLOW_FEATHER") {
+                earnedCoins += 5
+            }
+            if (task.category == "Босс" && profile.equippedArtifactId == "BOSS_BLADE") {
+                earnedCoins += 15
+                earnedXp += 50
+            }
+
             val updatedProfile = profile.copy(
                 totalTasksCompleted = profile.totalTasksCompleted + 1,
-                xp = profile.xp + 25,
-                coins = profile.coins + 5
+                xp = profile.xp + earnedXp,
+                coins = profile.coins + earnedCoins
             )
             updateProfileAndCheckLevelUp(updatedProfile)
 
@@ -450,7 +462,10 @@ class QuestRepository(
         val profile = userProfileDao.getUserProfile().firstOrNull() ?: return@withContext
         val newFocus = profile.totalFocusMinutes + minutes
         val bonusCoins = (minutes / 5).coerceAtLeast(1)
-        val bonusXp = minutes * 3
+        var bonusXp = minutes * 3
+        if (profile.equippedArtifactId == "CHRONO_TITAN") {
+            bonusXp += 15
+        }
         val updated = profile.copy(
             totalFocusMinutes = newFocus,
             coins = profile.coins + bonusCoins,
@@ -458,6 +473,31 @@ class QuestRepository(
         )
         updateProfileAndCheckLevelUp(updated)
         checkBadges(updated)
+    }
+
+    suspend fun unlockArtifact(artifactId: String, costCoins: Int): Boolean = withContext(Dispatchers.IO) {
+        val profile = userProfileDao.getUserProfile().firstOrNull() ?: return@withContext false
+        if (profile.coins >= costCoins) {
+            val unlockedList = profile.unlockedArtifactIdsRaw.split(",").map { it.trim() }.filter { it.isNotBlank() }.toMutableList()
+            if (!unlockedList.contains(artifactId)) {
+                unlockedList.add(artifactId)
+            }
+            val updated = profile.copy(
+                coins = profile.coins - costCoins,
+                unlockedArtifactIdsRaw = unlockedList.joinToString(",")
+            )
+            userProfileDao.insertOrUpdateProfile(updated)
+            return@withContext true
+        }
+        return@withContext false
+    }
+
+    suspend fun equipArtifact(artifactId: String) = withContext(Dispatchers.IO) {
+        val profile = userProfileDao.getUserProfile().firstOrNull() ?: return@withContext
+        if (profile.isArtifactUnlocked(artifactId)) {
+            val updated = profile.copy(equippedArtifactId = artifactId)
+            userProfileDao.insertOrUpdateProfile(updated)
+        }
     }
 
     private suspend fun updateProfileAndCheckLevelUp(profile: UserProfile) {

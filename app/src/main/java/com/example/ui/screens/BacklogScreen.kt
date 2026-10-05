@@ -1,6 +1,7 @@
 package com.example.ui.screens
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -14,6 +15,9 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
@@ -21,7 +25,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.model.Priority
 import com.example.data.model.TaskItem
+import com.example.ui.components.QuickTemplatesDialog
 import com.example.ui.theme.GoldAccent
+import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -38,10 +44,22 @@ fun BacklogScreen(
     onDecomposeTask: (TaskItem) -> Unit,
     onStartBossLevel: (title: String, steps: List<String>) -> Unit,
     onOpenBulkImport: () -> Unit,
-    onAddNewTask: () -> Unit
+    onAddNewTask: () -> Unit,
+    onSaveTask: (TaskItem) -> Unit = {}
 ) {
     var selectedTab by remember { mutableIntStateOf(0) } // 0: Бэклог, 1: Архив выполненных
     var showBossDialog by remember { mutableStateOf(false) }
+    var showTemplatesDialog by remember { mutableStateOf(false) }
+    var selectedSort by remember { mutableStateOf("ALL") }
+
+    val processedBacklogTasks = remember(backlogTasks, selectedSort) {
+        when (selectedSort) {
+            "ENERGY" -> backlogTasks.sortedBy { it.energyRequired }
+            "FASTEST" -> backlogTasks.sortedBy { it.estimatedMinutes }
+            "DEADLINE" -> backlogTasks.sortedWith(compareBy(nullsLast()) { it.dueDate })
+            else -> backlogTasks
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -77,17 +95,26 @@ fun BacklogScreen(
                     shape = RoundedCornerShape(16.dp)
                 )
 
-                Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.width(6.dp))
+
+                FilledTonalIconButton(
+                    onClick = { showTemplatesDialog = true },
+                    modifier = Modifier.size(50.dp).testTag("quick_templates_icon_button")
+                ) {
+                    Text("⚡", fontSize = 18.sp)
+                }
+
+                Spacer(modifier = Modifier.width(4.dp))
 
                 FilledTonalIconButton(
                     onClick = onOpenBulkImport,
-                    modifier = Modifier.size(52.dp).testTag("bulk_import_icon_button")
+                    modifier = Modifier.size(50.dp).testTag("bulk_import_icon_button")
                 ) {
                     Icon(Icons.Default.UploadFile, contentDescription = "Массовый импорт")
                 }
             }
 
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
             // Boss level launcher button
             Button(
@@ -99,9 +126,9 @@ fun BacklogScreen(
                 Text("⚔️ Запустить Босс-Цель Недели", color = androidx.compose.ui.graphics.Color.Black, fontWeight = FontWeight.Bold)
             }
 
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
-            // Eisenhower matrix priority filter chips
+            // Eisenhower matrix priority filter chips & smart sorting chips
             LazyRow(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -132,6 +159,29 @@ fun BacklogScreen(
                         selected = selectedPriority == Priority.MEDIUM,
                         onClick = { onSelectPriority(if (selectedPriority == Priority.MEDIUM) null else Priority.MEDIUM) },
                         label = { Text("Q3 Делегир.", fontSize = 12.sp) }
+                    )
+                }
+                item {
+                    AssistChip(
+                        onClick = {
+                            selectedSort = when (selectedSort) {
+                                "ALL" -> "ENERGY"
+                                "ENERGY" -> "FASTEST"
+                                "FASTEST" -> "DEADLINE"
+                                else -> "ALL"
+                            }
+                        },
+                        label = {
+                            Text(
+                                text = when (selectedSort) {
+                                    "ENERGY" -> "⚡ Легкие"
+                                    "FASTEST" -> "⏱ Быстрые"
+                                    "DEADLINE" -> "⚠️ Срочные"
+                                    else -> "Сортировка"
+                                },
+                                fontSize = 12.sp
+                            )
+                        }
                     )
                 }
             }
@@ -191,7 +241,7 @@ fun BacklogScreen(
             }
         }
 
-        val displayList = if (selectedTab == 0) backlogTasks else completedTasks
+        val displayList = if (selectedTab == 0) processedBacklogTasks else completedTasks
         val filteredList = displayList.filter { item ->
             val matchesQuery = searchQuery.isBlank() ||
                     item.title.contains(searchQuery, ignoreCase = true) ||
@@ -252,6 +302,16 @@ fun BacklogScreen(
             onDismiss = { showBossDialog = false }
         )
     }
+
+    if (showTemplatesDialog) {
+        QuickTemplatesDialog(
+            onSelectTemplate = { task ->
+                onSaveTask(task)
+                showTemplatesDialog = false
+            },
+            onDismiss = { showTemplatesDialog = false }
+        )
+    }
 }
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -261,6 +321,33 @@ fun BacklogItemCard(
     onToggle: () -> Unit,
     onEdit: () -> Unit
 ) {
+    var showXpPop by remember { mutableStateOf(false) }
+
+    LaunchedEffect(task.isCompleted) {
+        if (task.isCompleted) {
+            showXpPop = true
+            delay(1300)
+            showXpPop = false
+        }
+    }
+
+    val checkScale by animateFloatAsState(
+        targetValue = if (task.isCompleted) 1.25f else 1.0f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+        label = "checkScale"
+    )
+
+    val popOffsetY by animateFloatAsState(
+        targetValue = if (showXpPop) -26f else 0f,
+        animationSpec = tween(durationMillis = 1100, easing = LinearOutSlowInEasing),
+        label = "popY"
+    )
+    val popAlpha by animateFloatAsState(
+        targetValue = if (showXpPop) 1f else 0f,
+        animationSpec = tween(durationMillis = 1100),
+        label = "popAlpha"
+    )
+
     Card(
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
@@ -278,15 +365,36 @@ fun BacklogItemCard(
                 .padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            IconButton(
-                onClick = onToggle,
-                modifier = Modifier.size(36.dp)
-            ) {
-                Icon(
-                    imageVector = if (task.isCompleted) Icons.Default.CheckCircle else Icons.Outlined.Circle,
-                    contentDescription = "Отметить",
-                    tint = if (task.isCompleted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                )
+            Box(contentAlignment = Alignment.TopCenter) {
+                IconButton(
+                    onClick = onToggle,
+                    modifier = Modifier
+                        .size(36.dp)
+                        .scale(checkScale)
+                ) {
+                    Icon(
+                        imageVector = if (task.isCompleted) Icons.Default.CheckCircle else Icons.Outlined.Circle,
+                        contentDescription = "Отметить",
+                        tint = if (task.isCompleted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                if (popAlpha > 0.05f) {
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = GoldAccent,
+                        modifier = Modifier
+                            .offset(y = popOffsetY.dp)
+                            .graphicsLayer { alpha = popAlpha }
+                    ) {
+                        Text(
+                            text = "+25 XP 🪙+5",
+                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Black),
+                            color = Color.Black,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
+                }
             }
 
             Spacer(modifier = Modifier.width(8.dp))

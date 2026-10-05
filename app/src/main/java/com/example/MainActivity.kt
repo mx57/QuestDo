@@ -28,7 +28,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.example.data.model.TaskItem
+import com.example.data.model.*
 import com.example.ui.components.*
 import com.example.ui.screens.*
 import com.example.ui.theme.GoldAccent
@@ -292,7 +292,8 @@ class MainActivity : ComponentActivity() {
                                         activeLevel?.let { level ->
                                             viewModel.claimLevelReward("Победа над уровнем!")
                                         }
-                                    }
+                                    },
+                                    onSaveTask = { viewModel.saveTask(it) }
                                 )
 
                                 MainTab.BACKLOG -> BacklogScreen(
@@ -314,7 +315,8 @@ class MainActivity : ComponentActivity() {
                                     onAddNewTask = {
                                         taskToEdit = null
                                         showTaskEditDialog = true
-                                    }
+                                    },
+                                    onSaveTask = { viewModel.saveTask(it) }
                                 )
 
                                 MainTab.FOCUS -> FocusTimerScreen(
@@ -340,7 +342,9 @@ class MainActivity : ComponentActivity() {
                                     badges = badges,
                                     onRedeemReward = { reward, cb -> viewModel.redeemReward(reward, cb) },
                                     onAddReward = { viewModel.addReward(it) },
-                                    onDeleteReward = { viewModel.deleteReward(it) }
+                                    onDeleteReward = { viewModel.deleteReward(it) },
+                                    onUnlockArtifact = { artifact, cb -> viewModel.unlockArtifact(artifact, cb) },
+                                    onEquipArtifact = { artifact -> viewModel.equipArtifact(artifact) }
                                 )
 
                                 MainTab.CALENDAR -> CalendarStatsScreen(
