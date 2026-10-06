@@ -184,12 +184,12 @@ object LocalNlpParser {
 
         // Clean extracted keywords from title
         var cleanTitle = text
-            .replace(Regex("""\b(сегодня|завтра|послезавтра)\b""", RegexOption.IGNORE_CASE), "")
+            .replace(Regex("""(?<=\s|^)(сегодня|завтра|послезавтра)(?=\s|$)""", RegexOption.IGNORE_CASE), "")
             .replace(Regex("""через\s+\d+\s+дн(ей|я|ь)?""", RegexOption.IGNORE_CASE), "")
             .replace(Regex("""через\s+(\d+\s+)?(минут|мин|часа|часов|час)""", RegexOption.IGNORE_CASE), "")
             .replace(Regex("""в(о)?\s+(понедельник|вторник|среду|четверг|пятницу|субботу|воскресенье)""", RegexOption.IGNORE_CASE), "")
             .replace(Regex("""в\s+\d{1,2}(:\d{2})?""", RegexOption.IGNORE_CASE), "")
-            .replace(Regex("""\b(срочно|важно|микро|легко|быстро)\b""", RegexOption.IGNORE_CASE), "")
+            .replace(Regex("""(?<=\s|^)(срочно|важно|микро|легко|быстро)(?=\s|$)""", RegexOption.IGNORE_CASE), "")
             .trim()
             .replace(Regex("""\s+"""), " ")
 

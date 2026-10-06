@@ -25,9 +25,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
+import android.content.Intent
+import android.net.Uri
+import android.provider.Settings
 import com.example.data.model.*
 import com.example.ui.theme.GoldAccent
-import com.example.util.SystemAlarmHelper
 import java.util.Calendar
 
 @Composable
@@ -213,15 +215,42 @@ fun SettingsScreen(
 
                     Spacer(modifier = Modifier.height(14.dp))
 
-                    // Exact Alarm Permission Status (Android 12+)
-                    if (!SystemAlarmHelper.canScheduleExactAlarms(context)) {
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    val alarmManager = remember(context) { context.getSystemService(android.app.AlarmManager::class.java) }
+                    val canScheduleExact = remember(context) {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                            alarmManager?.canScheduleExactAlarms() != false
+                        } else true
+                    }
+                    val canDrawOverlays = remember(context) {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                            Settings.canDrawOverlays(context)
+                        } else true
+                    }
+
+                    // Exact Alarm Warning banner if permission missing
+                    if (!canScheduleExact) {
                         Surface(
                             shape = RoundedCornerShape(12.dp),
                             color = MaterialTheme.colorScheme.errorContainer,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(bottom = 12.dp)
-                                .clickable { SystemAlarmHelper.checkAndOpenExactAlarmSettings(context) }
+                                .clickable {
+                                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                                        try {
+                                            context.startActivity(
+                                                Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).apply {
+                                                    data = Uri.parse("package:${context.packageName}")
+                                                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                                                }
+                                            )
+                                        } catch (e: Exception) {
+                                            Toast.makeText(context, "Откройте Настройки -> Приложения -> QuestDo -> Будильники", Toast.LENGTH_LONG).show()
+                                        }
+                                    }
+                                }
                         ) {
                             Row(
                                 modifier = Modifier.padding(12.dp),
@@ -231,12 +260,12 @@ fun SettingsScreen(
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Column {
                                     Text(
-                                        text = "Точные будильники отключены",
+                                        text = "Точные будильники отключены в системе",
                                         style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
                                         color = MaterialTheme.colorScheme.onErrorContainer
                                     )
                                     Text(
-                                        text = "Нажмите, чтобы включить в настройках Android для надежного срабатывания",
+                                        text = "Нажмите, чтобы разрешить точные сигналы для своевременных напоминаний",
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onErrorContainer
                                     )
@@ -245,81 +274,103 @@ fun SettingsScreen(
                         }
                     }
 
-                    // System Alarm Clock Direct Integrations
-                    Text("Взаимодействие с системными Часами Android:", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold), color = MaterialTheme.colorScheme.primary)
-                    Spacer(modifier = Modifier.height(6.dp))
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    // Proprietary QuestDo Alarm & Overlay Info Card
+                    Surface(
+                        shape = RoundedCornerShape(16.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
+                        modifier = Modifier.fillMaxWidth()
                     ) {
-                        OutlinedButton(
-                            onClick = {
-                                SystemAlarmHelper.openSystemAlarms(context)
-                            },
-                            modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(12.dp)
-                        ) {
-                            Icon(Icons.Default.Alarm, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Будильники", fontSize = 11.sp)
-                        }
+                        Column(modifier = Modifier.padding(14.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text("⏰", fontSize = 20.sp)
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "Фирменный Будильник QuestDo",
+                                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold)
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "Собственное окно поверх экрана при срабатывании, звуковой сигнал набата, правило 5 секунд и кнопка мгновенного старта вместо внешних приложений.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
 
-                        OutlinedButton(
-                            onClick = {
-                                SystemAlarmHelper.openSystemTimers(context)
-                            },
-                            modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(12.dp)
-                        ) {
-                            Icon(Icons.Default.HourglassBottom, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Таймеры", fontSize = 11.sp)
+                            Spacer(modifier = Modifier.height(10.dp))
+
+                            // Overlay Permission Button / Status
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !canDrawOverlays) {
+                                            try {
+                                                context.startActivity(
+                                                    Intent(
+                                                        Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                                                        Uri.parse("package:${context.packageName}")
+                                                    ).apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK }
+                                                )
+                                            } catch (e: Exception) {
+                                                Toast.makeText(context, "Откройте Настройки -> Поверх других приложений", Toast.LENGTH_SHORT).show()
+                                            }
+                                        }
+                                    },
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Icon(
+                                        Icons.Default.Layers,
+                                        contentDescription = null,
+                                        tint = if (canDrawOverlays) MaterialTheme.colorScheme.primary else GoldAccent,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Column {
+                                        Text(
+                                            text = "Поверх других приложений (Наложение)",
+                                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold)
+                                        )
+                                        Text(
+                                            text = if (canDrawOverlays) "Разрешено: экран будильника всплывет поверх любого окна" else "Нажмите, чтобы включить наложение поверх других окон",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+                                SuggestionChip(
+                                    onClick = {
+                                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !canDrawOverlays) {
+                                            try {
+                                                context.startActivity(
+                                                    Intent(
+                                                        Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                                                        Uri.parse("package:${context.packageName}")
+                                                    ).apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK }
+                                                )
+                                            } catch (e: Exception) {
+                                                Toast.makeText(context, "Откройте Настройки -> Поверх других приложений", Toast.LENGTH_SHORT).show()
+                                            }
+                                        }
+                                    },
+                                    label = { Text(if (canDrawOverlays) "Активно ✓" else "Включить ⚙️", fontSize = 11.sp) }
+                                )
+                            }
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(6.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
 
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        FilledTonalButton(
-                            onClick = {
-                                val cal = Calendar.getInstance().apply { add(Calendar.MINUTE, 1) }
-                                SystemAlarmHelper.setSystemAlarm(
-                                    context = context,
-                                    hour = cal.get(Calendar.HOUR_OF_DAY),
-                                    minute = cal.get(Calendar.MINUTE),
-                                    message = "⚔️ Тест будильника QuestDo",
-                                    targetTimestamp = cal.timeInMillis
-                                )
-                            },
-                            modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(12.dp)
-                        ) {
-                            Text("⏰ Системный (+1м)", fontSize = 10.sp)
-                        }
-
-                        FilledTonalButton(
-                            onClick = {
-                                SystemAlarmHelper.setSystemTimer(
-                                    context,
-                                    30,
-                                    "🍅 Тест таймера QuestDo"
-                                )
-                            },
-                            modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(12.dp)
-                        ) {
-                            Text("⏱️ Системный (30с)", fontSize = 10.sp)
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(14.dp))
-
-                    // Verification Test Action Buttons
-                    Text("Внутренние тесты приложения QuestDo:", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    // Verification Action Buttons
+                    Text(
+                        "Проверка работы будильника и уведомлений:",
+                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                     Spacer(modifier = Modifier.height(6.dp))
 
                     Row(
@@ -329,7 +380,7 @@ fun SettingsScreen(
                         OutlinedButton(
                             onClick = {
                                 onTestNotification()
-                                Toast.makeText(context, "🔔 Тестовое уведомление отправлено!", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, "🔔 Всплывающее уведомление отправлено!", Toast.LENGTH_SHORT).show()
                             },
                             modifier = Modifier.weight(1f),
                             shape = RoundedCornerShape(12.dp)
@@ -337,16 +388,36 @@ fun SettingsScreen(
                             Text("🔔 Тест пуша", fontSize = 11.sp)
                         }
 
-                        Button(
+                        FilledTonalButton(
                             onClick = {
-                                onTestAlarm()
-                                Toast.makeText(context, "⏰ Будильник взведен на 10 сек! Вы можете свернуть приложение.", Toast.LENGTH_LONG).show()
+                                val dummyTask = TaskItem(
+                                    id = 777123L,
+                                    title = "⚔️ Победа над прокрастинацией: Первый микро-шаг",
+                                    category = "Квест",
+                                    priority = Priority.CRITICAL
+                                )
+                                com.example.AlarmAlertActivity.launchAlarm(context, dummyTask)
                             },
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier.weight(1.2f),
                             shape = RoundedCornerShape(12.dp)
                         ) {
-                            Text("⏰ Тест in-app (10с)", fontSize = 11.sp)
+                            Text("🚀 Экран-наложение", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                         }
+                    }
+
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    Button(
+                        onClick = {
+                            onTestAlarm()
+                            Toast.makeText(context, "⏰ Будильник сработает через 10 секунд! Сверните приложение или заблокируйте экран для проверки.", Toast.LENGTH_LONG).show()
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Icon(Icons.Default.Timer, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("⏳ Тест звонка в фоне через 10 сек (свернуть приложение)", fontSize = 12.sp)
                     }
                 }
             }

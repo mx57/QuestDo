@@ -265,7 +265,7 @@ fun TaskEditDialog(
 
                                     Spacer(modifier = Modifier.height(8.dp))
 
-                                    // System Clock Alarm Integration Switch
+                                    // QuestDo Proprietary In-App Alarm & Overlay Switch
                                     Row(
                                         modifier = Modifier.fillMaxWidth(),
                                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -273,11 +273,11 @@ fun TaskEditDialog(
                                     ) {
                                         Column(modifier = Modifier.weight(1f)) {
                                             Text(
-                                                text = "Звонок в системных Часах",
+                                                text = "Фирменный будильник QuestDo",
                                                 style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold)
                                             )
                                             Text(
-                                                text = "Ставит будильник в стандартное приложение часов",
+                                                text = "Всплывающий оверлей поверх экрана, звонок и кнопка откладывания",
                                                 style = MaterialTheme.typography.labelSmall,
                                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                                             )
@@ -290,23 +290,23 @@ fun TaskEditDialog(
 
                                     Spacer(modifier = Modifier.height(6.dp))
 
-                                    // Instant Test/Set Alarm Action
+                                    // Instant Test Alarm Overlay Action
                                     FilledTonalButton(
                                         onClick = {
-                                            dueDate?.let { ms ->
-                                                SystemAlarmHelper.setSystemAlarmFromTimestamp(
-                                                    context,
-                                                    ms,
-                                                    "⚔️ Квест: ${title.ifBlank { "Задача" }}"
-                                                )
-                                            }
+                                            val dummy = (initialTask ?: TaskItem(title = title.ifBlank { "Тестовый квест" })).copy(
+                                                title = title.ifBlank { "Тестовый квест" },
+                                                category = category,
+                                                priority = priority,
+                                                dueDate = dueDate
+                                            )
+                                            com.example.AlarmAlertActivity.launchAlarm(context, dummy)
                                         },
                                         modifier = Modifier.fillMaxWidth(),
                                         shape = RoundedCornerShape(12.dp)
                                     ) {
-                                        Icon(Icons.Default.AlarmAdd, contentDescription = null, modifier = Modifier.size(16.dp))
+                                        Icon(Icons.Default.NotificationsActive, contentDescription = null, modifier = Modifier.size(16.dp))
                                         Spacer(modifier = Modifier.width(6.dp))
-                                        Text("Поставить в системных часах сейчас ⏰", fontSize = 11.sp)
+                                        Text("Проверить окно будильника прямо сейчас 🔔", fontSize = 11.sp)
                                     }
                                 } else {
                                     Text(
@@ -566,14 +566,6 @@ fun TaskEditDialog(
                                     subtasksRaw = TaskItem.serializeSubtasks(subtasks)
                                 )
                                 onSaveTask(taskToSave)
-                                if (syncWithSystemAlarm && dueDate != null) {
-                                    SystemAlarmHelper.setSystemAlarmFromTimestamp(
-                                        context,
-                                        dueDate!!,
-                                        "⚔️ Квест: ${title.trim()}",
-                                        skipUi = true
-                                    )
-                                }
                                 onDismiss()
                             }
                         },

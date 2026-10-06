@@ -35,7 +35,7 @@ import androidx.compose.ui.window.Dialog
 import com.example.data.model.TaskItem
 import com.example.ui.theme.GoldAccent
 import com.example.ui.viewmodel.FocusTimerUiState
-import com.example.util.SystemAlarmHelper
+import com.example.util.QuestAlarmScheduler
 
 @Composable
 fun FocusTimerScreen(
@@ -427,7 +427,7 @@ fun FocusTimerScreen(
             }
         }
 
-        // System Clock Integration Row (Direct Android System Alarm & Timer)
+        // QuestDo Proprietary In-App Alarm & Floating Banner Row
         Surface(
             shape = RoundedCornerShape(16.dp),
             color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
@@ -436,7 +436,7 @@ fun FocusTimerScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 14.dp, vertical = 10.dp),
+                    .padding(horizontal = 14.dp, vertical = 12.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -445,49 +445,34 @@ fun FocusTimerScreen(
                     modifier = Modifier.weight(1f)
                 ) {
                     Icon(
-                        Icons.Default.Alarm,
+                        Icons.Default.NotificationsActive,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(20.dp)
+                        tint = GoldAccent,
+                        modifier = Modifier.size(22.dp)
                     )
-                    Spacer(modifier = Modifier.width(8.dp))
+                    Spacer(modifier = Modifier.width(10.dp))
                     Column {
                         Text(
-                            text = "Системные часы Android",
+                            text = "Фирменный будильник фокуса QuestDo",
                             style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold)
                         )
                         Text(
-                            text = "Запустить нативный таймер или будильник",
+                            text = "Всплывающий оверлей поверх экрана и торжественный гонг",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
 
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    FilledTonalButton(
-                        onClick = {
-                            val taskTitle = spotlightTask?.title ?: timerState.spotlightTaskTitle ?: "Фокус-сессия"
-                            val secondsToRun = if (timerState.timeLeftSeconds > 0) timerState.timeLeftSeconds else timerState.totalTimeMinutes * 60
-                            SystemAlarmHelper.setSystemTimer(context, secondsToRun, "🍅 $taskTitle")
-                        },
-                        shape = RoundedCornerShape(10.dp),
-                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
-                    ) {
-                        Text("⏱️ В часы", fontSize = 11.sp)
-                    }
-
-                    IconButton(
-                        onClick = { SystemAlarmHelper.openSystemAlarms(context) },
-                        modifier = Modifier.size(36.dp)
-                    ) {
-                        Icon(
-                            Icons.Default.Launch,
-                            contentDescription = "Открыть часы",
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
+                FilledTonalButton(
+                    onClick = {
+                        QuestAlarmScheduler.scheduleTestAlarm(context, 5)
+                        android.widget.Toast.makeText(context, "⏰ Будильник QuestDo сработает через 5 секунд!", android.widget.Toast.LENGTH_SHORT).show()
+                    },
+                    shape = RoundedCornerShape(10.dp),
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
+                ) {
+                    Text("🔔 Тест (5с)", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                 }
             }
         }

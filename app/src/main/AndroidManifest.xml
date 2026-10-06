@@ -6,6 +6,8 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="com.android.alarm.permission.SET_ALARM" />
@@ -46,6 +48,13 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name=".AlarmAlertActivity"
+            android:exported="true"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            android:theme="@style/Theme.MyApplication" />
+
         <receiver
             android:name=".receiver.AlarmReceiver"
             android:enabled="true"
@@ -65,6 +74,7 @@
             android:exported="false">
             <intent-filter>
                 <action android:name="com.example.ACTION_COMPLETE_TASK" />
+                <action android:name="com.example.ACTION_SNOOZE_TASK" />
             </intent-filter>
         </receiver>
     </application>

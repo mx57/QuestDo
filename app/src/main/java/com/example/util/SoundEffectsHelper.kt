@@ -71,6 +71,40 @@ class SoundEffectsHelper(private val context: Context) {
         }
     }
 
+    private var activeAlarmRingtone: android.media.Ringtone? = null
+
+    /**
+     * Starts playing a continuous alarm ringtone and repeating vibration until stopped.
+     */
+    fun startContinuousAlarmRingtone() {
+        stopAlarmRingtone()
+        try {
+            val alarmUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
+                ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+            val ringtone = RingtoneManager.getRingtone(context, alarmUri)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                ringtone?.isLooping = true
+            }
+            ringtone?.play()
+            activeAlarmRingtone = ringtone
+            triggerVibration("ALARM")
+        } catch (e: Exception) {
+            playToneSequence()
+        }
+    }
+
+    /**
+     * Stops any currently playing alarm ringtone.
+     */
+    fun stopAlarmRingtone() {
+        try {
+            activeAlarmRingtone?.stop()
+        } catch (e: Exception) {
+            // Ignore
+        }
+        activeAlarmRingtone = null
+    }
+
     /**
      * Plays a distinct alarm bell / chime when a scheduled task alarm fires.
      */

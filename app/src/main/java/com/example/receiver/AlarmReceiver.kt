@@ -38,6 +38,7 @@ class AlarmReceiver : BroadcastReceiver() {
                                 NotificationHelper.showTaskReminder(context, taskId, title, category, priority)
                                 soundHelper.playAlarmAlert()
                                 soundHelper.triggerVibration("ALARM")
+                                com.example.AlarmAlertActivity.launchAlarm(context, task)
                             }
                         } catch (e: Exception) {
                             // Fallback show notification anyway

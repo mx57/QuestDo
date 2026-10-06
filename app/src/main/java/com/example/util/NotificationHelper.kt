@@ -22,7 +22,11 @@ object NotificationHelper {
     const val CHANNEL_DAILY_MOTIVATION = "quest_daily_motivation"
 
     const val ACTION_COMPLETE_TASK = "com.example.ACTION_COMPLETE_TASK"
+    const val ACTION_SNOOZE_TASK = "com.example.ACTION_SNOOZE_TASK"
     const val EXTRA_TASK_ID = "extra_task_id"
+    const val EXTRA_TASK_TITLE = "extra_task_title"
+    const val EXTRA_TASK_CATEGORY = "extra_task_category"
+    const val EXTRA_TASK_PRIORITY = "extra_task_priority"
 
     /**
      * Initializes all notification channels with high priority, sound, and vibration.
@@ -108,6 +112,21 @@ object NotificationHelper {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
+        // Full Screen Alert Activity Intent (Ringing lock-screen / heads-up overlay)
+        val fullScreenIntent = Intent(context, com.example.AlarmAlertActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            putExtra(EXTRA_TASK_ID, taskId)
+            putExtra(EXTRA_TASK_TITLE, title)
+            putExtra(EXTRA_TASK_CATEGORY, category)
+            putExtra(EXTRA_TASK_PRIORITY, priorityTitle)
+        }
+        val fullScreenPendingIntent = PendingIntent.getActivity(
+            context,
+            (taskId + 200000).toInt(),
+            fullScreenIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
         // Action: Complete task directly from notification
         val completeIntent = Intent(context, TaskActionReceiver::class.java).apply {
             action = ACTION_COMPLETE_TASK
@@ -117,6 +136,21 @@ object NotificationHelper {
             context,
             (taskId + 100000).toInt(),
             completeIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        // Action: Snooze 5 minutes directly from notification
+        val snoozeIntent = Intent(context, TaskActionReceiver::class.java).apply {
+            action = ACTION_SNOOZE_TASK
+            putExtra(EXTRA_TASK_ID, taskId)
+            putExtra(EXTRA_TASK_TITLE, title)
+            putExtra(EXTRA_TASK_CATEGORY, category)
+            putExtra(EXTRA_TASK_PRIORITY, priorityTitle)
+        }
+        val snoozePendingIntent = PendingIntent.getBroadcast(
+            context,
+            (taskId + 300000).toInt(),
+            snoozeIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
@@ -136,9 +170,11 @@ object NotificationHelper {
             .setColor(0xFFFFB300.toInt()) // Gold
             .setSound(soundUri)
             .setVibrate(longArrayOf(0, 250, 150, 250, 150, 400))
-            .setContentIntent(openPendingIntent)
-            .addAction(R.drawable.ic_launcher_foreground, "✅ Выполнить", completePendingIntent)
-            .addAction(R.drawable.ic_launcher_foreground, "📱 Открыть", openPendingIntent)
+            .setContentIntent(fullScreenPendingIntent)
+            .setFullScreenIntent(fullScreenPendingIntent, true)
+            .addAction(R.drawable.ic_launcher_foreground, "💤 +5 мин", snoozePendingIntent)
+            .addAction(R.drawable.ic_launcher_foreground, "✅ Сделано", completePendingIntent)
+            .addAction(R.drawable.ic_launcher_foreground, "🔔 Открыть", openPendingIntent)
 
         val notificationManager = NotificationManagerCompat.from(context)
         try {

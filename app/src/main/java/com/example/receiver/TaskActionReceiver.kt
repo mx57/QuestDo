@@ -67,6 +67,23 @@ class TaskActionReceiver : BroadcastReceiver() {
 
                 Toast.makeText(context, "Квест выполнен! +25 XP, +5 монет 🪙", Toast.LENGTH_SHORT).show()
             }
+        } else if (action == NotificationHelper.ACTION_SNOOZE_TASK) {
+            val taskId = intent.getLongExtra(NotificationHelper.EXTRA_TASK_ID, -1L)
+            val title = intent.getStringExtra(NotificationHelper.EXTRA_TASK_TITLE) ?: "Квест"
+            val category = intent.getStringExtra(NotificationHelper.EXTRA_TASK_CATEGORY) ?: "Задача"
+
+            if (taskId != -1L) {
+                NotificationHelper.cancelNotification(context, taskId.toInt())
+                val snoozeTime = System.currentTimeMillis() + 5 * 60 * 1000L
+                val dummyTask = TaskItem(
+                    id = taskId,
+                    title = title,
+                    category = category,
+                    dueDate = snoozeTime
+                )
+                QuestAlarmScheduler.scheduleTaskAlarm(context, dummyTask)
+                Toast.makeText(context, "💤 Будильник отложен на 5 минут", Toast.LENGTH_SHORT).show()
+            }
         }
     }
 

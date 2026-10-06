@@ -583,6 +583,22 @@ class QuestViewModel(application: Application) : AndroidViewModel(application) {
         _showAntiProcrastinationDialog.value = false
     }
 
+    fun claimSabotageVictory() {
+        viewModelScope.launch {
+            triggerHaptic(HapticType.VICTORY)
+            if (userProfile.value.soundEffectsEnabled) {
+                soundHelper.playVictoryChime()
+            }
+            val current = userProfile.value
+            val updated = current.copy(
+                xp = current.xp + 25,
+                coins = current.coins + 5
+            )
+            repository.updateProfile(updated)
+            _showConfetti.value = true
+        }
+    }
+
     fun openBreathingExerciseDialog() {
         _showBreathingExerciseDialog.value = true
     }

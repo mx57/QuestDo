@@ -91,6 +91,11 @@ class MainActivity : ComponentActivity() {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                     permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
                 }
+                if (intent.getBooleanExtra("START_TWO_MINUTE_FOCUS", false)) {
+                    currentTab = MainTab.FOCUS
+                    viewModel.setTimerDuration(2)
+                    viewModel.startTimer()
+                }
             }
 
             BackHandler(enabled = currentTab != MainTab.QUEST) {
@@ -409,6 +414,15 @@ class MainActivity : ComponentActivity() {
                         AntiProcrastinationDialog(
                             onShuffleQuest = { viewModel.shuffleCurrentQuest() },
                             onStartBreathing = { viewModel.openBreathingExerciseDialog() },
+                            onStartTwoMinuteFocus = {
+                                currentTab = MainTab.FOCUS
+                                viewModel.setTimerDuration(2)
+                                viewModel.startTimer()
+                                viewModel.closeAntiProcrastinationDialog()
+                            },
+                            onClaimVictory = {
+                                viewModel.claimSabotageVictory()
+                            },
                             onDismiss = { viewModel.closeAntiProcrastinationDialog() }
                         )
                     }
