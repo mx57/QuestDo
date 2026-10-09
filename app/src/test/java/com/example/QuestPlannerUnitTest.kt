@@ -124,4 +124,34 @@ class QuestPlannerUnitTest {
         assertEquals(14, localCal.get(Calendar.HOUR_OF_DAY))
         assertEquals(30, localCal.get(Calendar.MINUTE))
     }
+
+    @Test
+    fun testDemonMentorEngineHasOver100Quotes() {
+        val total = com.example.data.model.DemonMentorEngine.totalPhrasesCount
+        assertTrue("Demon Mentor Engine must contain at least 100 quotes, found: $total", total >= 100)
+        assertTrue(com.example.data.model.DemonMentorEngine.MORNING_ROASTS.size >= 15)
+        assertTrue(com.example.data.model.DemonMentorEngine.AFTERNOON_ROASTS.size >= 15)
+        assertTrue(com.example.data.model.DemonMentorEngine.EVENING_ROASTS.size >= 15)
+        assertTrue(com.example.data.model.DemonMentorEngine.NIGHT_ROASTS.size >= 15)
+        assertTrue(com.example.data.model.DemonMentorEngine.TASK_COMPLETED_ROASTS.size >= 15)
+        assertTrue(com.example.data.model.DemonMentorEngine.OVERDUE_SLACKING_ROASTS.size >= 15)
+        assertTrue(com.example.data.model.DemonMentorEngine.ANTI_PROCRASTINATION_ROASTS.size >= 15)
+        assertTrue(com.example.data.model.DemonMentorEngine.DEVILS_PACT_ROASTS.size >= 15)
+    }
+
+    @Test
+    fun testDemonMentorContextualQuoteIntegration() {
+        val quote = com.example.data.model.MotivationalEngine.getContextualQuote(MoodType.DEMON)
+        assertNotNull(quote)
+        assertTrue(quote.quote.isNotBlank())
+        assertEquals("Люцик • Адский Наставник 😈", quote.authorOrTip)
+        assertEquals("Адский Пинoк 🔥", quote.category)
+    }
+
+    @Test
+    fun testDemonMascotTapRoastReturnsSnappyQuips() {
+        val roast = com.example.data.model.DemonMentorEngine.getRandomMascotTapRoast()
+        assertNotNull(roast)
+        assertTrue(roast.isNotBlank())
+    }
 }

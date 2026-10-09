@@ -120,6 +120,26 @@ class QuestViewModel(application: Application) : AndroidViewModel(application) {
     val timerState: StateFlow<FocusTimerUiState> = _timerState.asStateFlow()
     private var timerJob: Job? = null
 
+    // Demon Mentor Mode & Devil's Pact States
+    val showDevilsPactDialog = MutableStateFlow(false)
+    val showCauldronDialog = MutableStateFlow(false)
+    val pactRemainingSeconds = MutableStateFlow(0)
+    val demonMascotRoast = MutableStateFlow("")
+    private var pactJob: Job? = null
+
+    init {
+        // Monitor profile for active pact countdown
+        viewModelScope.launch {
+            userProfile.collect { profile ->
+                if (profile.devilPactActive && profile.devilPactEndTime > System.currentTimeMillis()) {
+                    val remaining = ((profile.devilPactEndTime - System.currentTimeMillis()) / 1000).toInt()
+                    pactRemainingSeconds.value = remaining.coerceAtLeast(0)
+                    startPactTimerLoop(profile.devilPactEndTime)
+                }
+            }
+        }
+    }
+
     fun refreshQuote() {
         val mood = userProfile.value.activeMood
         _currentQuote.value = MotivationalEngine.getContextualQuote(mood)
@@ -605,6 +625,171 @@ class QuestViewModel(application: Application) : AndroidViewModel(application) {
 
     fun closeBreathingExerciseDialog() {
         _showBreathingExerciseDialog.value = false
+    }
+
+    // ==========================================
+    // DEMON MENTOR & DEVIL'S PACT LOGIC
+    // ==========================================
+
+    fun toggleDemonMode(enabled: Boolean) {
+        viewModelScope.launch {
+            val current = userProfile.value
+            val updated = current.copy(
+                isDemonMode = enabled,
+                activeMood = if (enabled) MoodType.DEMON else MoodType.FOCUS,
+                themeMode = if (enabled) ThemeMode.INFERNAL else ThemeMode.SYSTEM,
+                notificationTone = if (enabled) NotificationTone.DEMON else NotificationTone.CARING,
+                appIconStyle = if (enabled) AppIconStyle.DEMON else AppIconStyle.SHIELD
+            )
+            repository.updateProfile(updated)
+            if (enabled) {
+                soundHelper.playDemonLaugh()
+                soundHelper.triggerVibration("DEMON")
+                _currentQuote.value = DemonMentorEngine.getDemonContextualQuote()
+                demonMascotRoast.value = DemonMentorEngine.getRandomRoast()
+            } else {
+                _currentQuote.value = MotivationalEngine.getContextualQuote(MoodType.FOCUS)
+            }
+        }
+    }
+
+    fun tapDemonMascot() {
+        val roast = DemonMentorEngine.getRandomMascotTapRoast()
+        demonMascotRoast.value = roast
+        soundHelper.playDemonLaugh()
+        soundHelper.triggerVibration("DEMON")
+    }
+
+    fun openDevilsPactDialog() {
+        showDevilsPactDialog.value = true
+    }
+
+    fun closeDevilsPactDialog() {
+        showDevilsPactDialog.value = false
+    }
+
+    fun openCauldronDialog() {
+        showCauldronDialog.value = true
+    }
+
+    fun closeCauldronDialog() {
+        showCauldronDialog.value = false
+    }
+
+    fun startDevilsPact(taskId: Long, durationMinutes: Int) {
+        viewModelScope.launch {
+            val all = (currentQuestTasks.value + backlogTasks.value).distinctBy { it.id }
+            val task = all.find { it.id == taskId } ?: return@launch
+            val endTime = System.currentTimeMillis() + (durationMinutes * 60 * 1000L)
+
+            val updated = userProfile.value.copy(
+                devilPactActive = true,
+                devilPactTaskId = taskId,
+                devilPactTaskTitle = task.title,
+                devilPactDurationMinutes = durationMinutes,
+                devilPactEndTime = endTime
+            )
+            repository.updateProfile(updated)
+            showDevilsPactDialog.value = false
+            soundHelper.playHellBurst()
+            soundHelper.triggerVibration("DEMON")
+            startPactTimerLoop(endTime)
+        }
+    }
+
+    private fun startPactTimerLoop(targetEndTime: Long) {
+        pactJob?.cancel()
+        pactJob = viewModelScope.launch {
+            while (isActive) {
+                val remainingMs = targetEndTime - System.currentTimeMillis()
+                val remainingSec = ((remainingMs + 999) / 1000).toInt().coerceAtLeast(0)
+                pactRemainingSeconds.value = remainingSec
+
+                if (remainingSec <= 0) {
+                    // Pact expired! User failed to complete task in time!
+                    val current = userProfile.value
+                    if (current.devilPactActive) {
+                        val penaltyCoins = (current.coins - 15).coerceAtLeast(0)
+                        val updated = current.copy(
+                            devilPactActive = false,
+                            devilPactTaskId = 0L,
+                            devilPactTaskTitle = "",
+                            devilPactEndTime = 0L,
+                            devilPactFailures = current.devilPactFailures + 1,
+                            coins = penaltyCoins
+                        )
+                        repository.updateProfile(updated)
+                        soundHelper.playPactLost()
+                    }
+                    break
+                }
+                delay(1000)
+            }
+        }
+    }
+
+    fun completeDevilsPactSuccess() {
+        viewModelScope.launch {
+            val current = userProfile.value
+            pactJob?.cancel()
+            pactJob = null
+
+            val taskId = current.devilPactTaskId
+            val all = (currentQuestTasks.value + backlogTasks.value).distinctBy { it.id }
+            val task = all.find { it.id == taskId }
+            if (task != null && !task.isCompleted) {
+                repository.toggleTaskCompleted(task)
+            }
+
+            // Grant Double XP and Gold (+100% bonus: +60 XP, +25 coins)
+            val updated = current.copy(
+                devilPactActive = false,
+                devilPactTaskId = 0L,
+                devilPactTaskTitle = "",
+                devilPactEndTime = 0L,
+                devilPactSuccesses = current.devilPactSuccesses + 1,
+                xp = current.xp + 60,
+                coins = current.coins + 25
+            )
+            repository.updateProfile(updated)
+            soundHelper.playPactWon()
+            _showConfetti.value = true
+        }
+    }
+
+    fun cancelDevilsPact() {
+        viewModelScope.launch {
+            pactJob?.cancel()
+            pactJob = null
+            val current = userProfile.value
+            val penaltyCoins = (current.coins - 15).coerceAtLeast(0)
+            val updated = current.copy(
+                devilPactActive = false,
+                devilPactTaskId = 0L,
+                devilPactTaskTitle = "",
+                devilPactEndTime = 0L,
+                devilPactFailures = current.devilPactFailures + 1,
+                coins = penaltyCoins
+            )
+            repository.updateProfile(updated)
+            soundHelper.playPactLost()
+        }
+    }
+
+    fun burnCauldronSins() {
+        viewModelScope.launch {
+            val current = userProfile.value
+            val overdueCount = urgentTasks.value.size
+            val sinsToAdd = if (overdueCount > 0) overdueCount else 1
+            val updated = current.copy(
+                cauldronSinsBurned = current.cauldronSinsBurned + sinsToAdd,
+                xp = current.xp + (sinsToAdd * 15)
+            )
+            repository.updateProfile(updated)
+            showCauldronDialog.value = false
+            soundHelper.playHellBurst()
+            _showConfetti.value = true
+        }
     }
 
     private fun triggerHaptic(type: HapticType) {

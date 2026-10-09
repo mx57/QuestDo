@@ -71,6 +71,78 @@ class SoundEffectsHelper(private val context: Context) {
         }
     }
 
+    /**
+     * Mischievous demonic laughter sequence using synthesized audio tones.
+     */
+    fun playDemonLaugh() {
+        audioScope.launch {
+            try {
+                val toneGen = ToneGenerator(AudioManager.STREAM_NOTIFICATION, 90)
+                // Chuckling rhythmic tones descending into hellish grin
+                toneGen.startTone(ToneGenerator.TONE_PROP_BEEP2, 100)
+                delay(120)
+                toneGen.startTone(ToneGenerator.TONE_PROP_BEEP2, 100)
+                delay(120)
+                toneGen.startTone(ToneGenerator.TONE_PROP_BEEP, 140)
+                delay(160)
+                toneGen.startTone(ToneGenerator.TONE_PROP_PROMPT, 220)
+                delay(240)
+                toneGen.release()
+                triggerVibration("DEMON")
+            } catch (e: Exception) {
+                Log.e("SoundEffectsHelper", "Demon laugh sound error: ${e.message}")
+            }
+        }
+    }
+
+    fun playHellBurst() {
+        audioScope.launch {
+            try {
+                val toneGen = ToneGenerator(AudioManager.STREAM_NOTIFICATION, 85)
+                toneGen.startTone(ToneGenerator.TONE_CDMA_HIGH_L, 120)
+                delay(140)
+                toneGen.startTone(ToneGenerator.TONE_CDMA_MED_L, 180)
+                delay(200)
+                toneGen.release()
+                triggerVibration("MEDIUM")
+            } catch (e: Exception) {
+                // Ignore
+            }
+        }
+    }
+
+    fun playPactWon() {
+        audioScope.launch {
+            try {
+                val toneGen = ToneGenerator(AudioManager.STREAM_NOTIFICATION, 95)
+                toneGen.startTone(ToneGenerator.TONE_PROP_ACK, 160)
+                delay(180)
+                toneGen.startTone(ToneGenerator.TONE_PROP_BEEP2, 220)
+                delay(240)
+                toneGen.startTone(ToneGenerator.TONE_PROP_ACK, 350)
+                delay(380)
+                toneGen.release()
+                triggerVibration("VICTORY")
+            } catch (e: Exception) {
+                // Ignore
+            }
+        }
+    }
+
+    fun playPactLost() {
+        audioScope.launch {
+            try {
+                val toneGen = ToneGenerator(AudioManager.STREAM_NOTIFICATION, 85)
+                toneGen.startTone(ToneGenerator.TONE_PROP_NACK, 350)
+                delay(380)
+                toneGen.release()
+                triggerVibration("ALARM")
+            } catch (e: Exception) {
+                // Ignore
+            }
+        }
+    }
+
     private var activeAlarmRingtone: android.media.Ringtone? = null
 
     /**
@@ -131,6 +203,7 @@ class SoundEffectsHelper(private val context: Context) {
                     "LIGHT" -> VibrationEffect.createOneShot(35, VibrationEffect.DEFAULT_AMPLITUDE)
                     "MEDIUM" -> VibrationEffect.createOneShot(70, VibrationEffect.DEFAULT_AMPLITUDE)
                     "ALARM" -> VibrationEffect.createWaveform(longArrayOf(0, 250, 150, 250, 150, 400), -1)
+                    "DEMON" -> VibrationEffect.createWaveform(longArrayOf(0, 100, 60, 100, 60, 220), -1)
                     else -> VibrationEffect.createWaveform(longArrayOf(0, 80, 60, 140, 80, 220), -1)
                 }
                 vibrator?.vibrate(effect)

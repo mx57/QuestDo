@@ -45,7 +45,8 @@ fun SettingsScreen(
     onSetNotifications: (Boolean) -> Unit,
     onSetDailyReminderTime: (hour: Int, minute: Int) -> Unit,
     onTestNotification: () -> Unit,
-    onTestAlarm: () -> Unit
+    onTestAlarm: () -> Unit,
+    onToggleDemonMode: (Boolean) -> Unit = {}
 ) {
     val context = LocalContext.current
     var hasNotificationPermission by remember {
@@ -461,6 +462,56 @@ fun SettingsScreen(
                             )
                         }
                     }
+                }
+            }
+        }
+
+        // Section: Infernal Demon Mentor Mode
+        item {
+            Card(
+                shape = RoundedCornerShape(22.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = if (userProfile.isDemonMode) androidx.compose.ui.graphics.Color(0xFF26050A) else MaterialTheme.colorScheme.surface
+                ),
+                border = if (userProfile.isDemonMode) androidx.compose.foundation.BorderStroke(1.5.dp, androidx.compose.ui.graphics.Color(0xFFFF1744)) else null,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(18.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("😈🔥", fontSize = 26.sp)
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Column {
+                                Text(
+                                    text = "Режим Демона-наставника",
+                                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                    color = if (userProfile.isDemonMode) androidx.compose.ui.graphics.Color(0xFFFF5252) else MaterialTheme.colorScheme.onSurface
+                                )
+                                Text(
+                                    text = "Черный юмор, сарказм и адская тема",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = if (userProfile.isDemonMode) androidx.compose.ui.graphics.Color(0xFFFF8A80) else MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                        Switch(
+                            checked = userProfile.isDemonMode,
+                            onCheckedChange = { onToggleDemonMode(it) }
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    Text(
+                        text = "Включает Люцика — едкого адского наставника с базой из 120+ язвительных цитат, черную риторику, перекрашивает интерфейс в кроваво-алый цвет, добавляет чертиков, «Сделку с Дьяволом» и Котёл Грехов.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (userProfile.isDemonMode) androidx.compose.ui.graphics.Color(0xFFFFCDD2) else MaterialTheme.colorScheme.onSurfaceVariant,
+                        lineHeight = 18.sp
+                    )
                 }
             }
         }

@@ -32,7 +32,8 @@ enum class AntiProcrastinationTab(val title: String, val emoji: String) {
     DIAGNOSIS("Диагностика", "🩺"),
     FIVE_SECONDS("5 Секунд", "🚀"),
     SWISS_CHEESE("Сыр Лакейна", "🧀"),
-    CBT_REFRAME("КПТ-Разбор", "🪞")
+    CBT_REFRAME("КПТ-Разбор", "🪞"),
+    DEMON_KICK("Адский Пинок", "😈")
 }
 
 data class ResistanceCause(
@@ -361,6 +362,48 @@ fun AntiProcrastinationDialog(
                                             Spacer(modifier = Modifier.height(2.dp))
                                             Text(text = a, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                         }
+                                    }
+                                }
+                            }
+                        }
+
+                        AntiProcrastinationTab.DEMON_KICK -> {
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                Surface(
+                                    shape = RoundedCornerShape(16.dp),
+                                    color = Color(0xFF2B070C),
+                                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFFF1744)),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Column(
+                                        modifier = Modifier.padding(16.dp),
+                                        horizontalAlignment = Alignment.CenterHorizontally
+                                    ) {
+                                        Text(
+                                            text = "😈 Адский Разнос от Люцика",
+                                            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                                            color = Color(0xFFFF5252)
+                                        )
+                                        Spacer(modifier = Modifier.height(6.dp))
+                                        Text(
+                                            text = "«${com.example.data.model.DemonMentorEngine.getSosRoast()}»",
+                                            style = MaterialTheme.typography.bodySmall.copy(
+                                                fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
+                                                lineHeight = 18.sp
+                                            ),
+                                            color = Color(0xFFFFEBEE),
+                                            textAlign = TextAlign.Center
+                                        )
+                                        Spacer(modifier = Modifier.height(12.dp))
+                                        Text(
+                                            text = "Хватит жалеть себя! Нажми кнопку ниже и сделай 2 минуты на чистой ярости!",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = Color(0xFFFF8A80),
+                                            textAlign = TextAlign.Center
+                                        )
                                     }
                                 }
                             }

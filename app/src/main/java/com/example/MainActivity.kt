@@ -76,6 +76,10 @@ class MainActivity : ComponentActivity() {
             val staleTasks by viewModel.staleTasks.collectAsStateWithLifecycle()
             val timerState by viewModel.timerState.collectAsStateWithLifecycle()
 
+            val showDevilsPactDialog by viewModel.showDevilsPactDialog.collectAsStateWithLifecycle()
+            val showCauldronDialog by viewModel.showCauldronDialog.collectAsStateWithLifecycle()
+            val pactRemainingSeconds by viewModel.pactRemainingSeconds.collectAsStateWithLifecycle()
+
             var currentTab by remember { mutableStateOf(MainTab.QUEST) }
             var taskToEdit by remember { mutableStateOf<TaskItem?>(null) }
             var showTaskEditDialog by remember { mutableStateOf(false) }
@@ -104,7 +108,8 @@ class MainActivity : ComponentActivity() {
 
             QuestDoTheme(
                 mood = userProfile.activeMood,
-                themeMode = userProfile.themeMode
+                themeMode = userProfile.themeMode,
+                isDemonMode = userProfile.isDemonMode
             ) {
                 Box(modifier = Modifier.fillMaxSize()) {
                     Scaffold(
@@ -156,7 +161,7 @@ class MainActivity : ComponentActivity() {
                                         shape = RoundedCornerShape(12.dp),
                                         color = MaterialTheme.colorScheme.primaryContainer,
                                         modifier = Modifier
-                                            .padding(end = 8.dp)
+                                            .padding(end = 6.dp)
                                             .clickable {
                                                 val allMoods = com.example.data.model.MoodType.values()
                                                 val nextIndex = (userProfile.activeMood.ordinal + 1) % allMoods.size
@@ -167,8 +172,29 @@ class MainActivity : ComponentActivity() {
                                             text = "${userProfile.activeMood.iconEmoji} ${userProfile.activeMood.titleRu}",
                                             style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
                                             color = MaterialTheme.colorScheme.onPrimaryContainer,
-                                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp)
                                         )
+                                    }
+
+                                    // Quick Demon Mentor Switcher Button
+                                    Surface(
+                                        shape = RoundedCornerShape(12.dp),
+                                        color = if (userProfile.isDemonMode) androidx.compose.ui.graphics.Color(0xFFD50000) else MaterialTheme.colorScheme.secondaryContainer,
+                                        modifier = Modifier
+                                            .padding(end = 8.dp)
+                                            .clickable { viewModel.toggleDemonMode(!userProfile.isDemonMode) }
+                                            .testTag("demon_mode_top_toggle")
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(
+                                                text = if (userProfile.isDemonMode) "😈 Демон" else "😇 Ангел",
+                                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                                color = if (userProfile.isDemonMode) androidx.compose.ui.graphics.Color.White else MaterialTheme.colorScheme.onSecondaryContainer
+                                            )
+                                        }
                                     }
 
                                     IconButton(
@@ -311,7 +337,14 @@ class MainActivity : ComponentActivity() {
                                                 viewModel.claimLevelReward("Победа над уровнем!")
                                             }
                                         },
-                                        onSaveTask = { viewModel.saveTask(it) }
+                                        onSaveTask = { viewModel.saveTask(it) },
+                                        onToggleDemonMode = { viewModel.toggleDemonMode(it) },
+                                        onTapDemonRoast = { viewModel.tapDemonMascot() },
+                                        onOpenDevilsPact = { viewModel.openDevilsPactDialog() },
+                                        onOpenCauldron = { viewModel.openCauldronDialog() },
+                                        pactRemainingSeconds = pactRemainingSeconds,
+                                        onCompletePactSuccess = { viewModel.completeDevilsPactSuccess() },
+                                        onCancelPact = { viewModel.cancelDevilsPact() }
                                     )
 
                                     MainTab.BACKLOG -> BacklogScreen(
@@ -382,7 +415,8 @@ class MainActivity : ComponentActivity() {
                                         onSetNotifications = { viewModel.setNotificationsEnabled(it) },
                                         onSetDailyReminderTime = { h, m -> viewModel.setDailyReminderTime(h, m) },
                                         onTestNotification = { viewModel.triggerTestNotification() },
-                                        onTestAlarm = { viewModel.triggerTestAlarm(10) }
+                                        onTestAlarm = { viewModel.triggerTestAlarm(10) },
+                                        onToggleDemonMode = { viewModel.toggleDemonMode(it) }
                                     )
                                 }
                             }
@@ -459,6 +493,23 @@ class MainActivity : ComponentActivity() {
                                 showEveningCheckoutDialog = false
                             },
                             onDismiss = { showEveningCheckoutDialog = false }
+                        )
+                    }
+
+                    if (showDevilsPactDialog) {
+                        DevilsPactDialog(
+                            availableTasks = (currentTasks + backlogTasks).distinctBy { it.id },
+                            onSignPact = { taskId, mins -> viewModel.startDevilsPact(taskId, mins) },
+                            onDismiss = { viewModel.closeDevilsPactDialog() }
+                        )
+                    }
+
+                    if (showCauldronDialog) {
+                        CauldronOfSinsDialog(
+                            overdueTasksCount = urgentTasks.size,
+                            sinsBurnedCount = userProfile.cauldronSinsBurned,
+                            onPurgeSins = { viewModel.burnCauldronSins() },
+                            onDismiss = { viewModel.closeCauldronDialog() }
                         )
                     }
                 }

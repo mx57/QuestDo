@@ -128,6 +128,26 @@ fun getMoodColorScheme(mood: MoodType, isDark: Boolean, isAmoled: Boolean = fals
                 )
             }
         }
+        MoodType.DEMON -> {
+            // Hell / Infernal fiery theme
+            darkColorScheme(
+                primary = DemonPrimaryDark,
+                onPrimary = Color.White,
+                primaryContainer = Color(0xFF4A0812),
+                onPrimaryContainer = Color(0xFFFFB4AB),
+                secondary = DemonSecondary,
+                onSecondary = Color.Black,
+                secondaryContainer = Color(0xFF6B2200),
+                onSecondaryContainer = Color(0xFFFFDBCF),
+                background = if (isAmoled) AmoledBackground else DemonSurfaceDark,
+                surface = if (isAmoled) AmoledSurface else DemonSurfaceDark,
+                surfaceVariant = if (isAmoled) AmoledCard else DemonCardDark,
+                tertiary = DemonTertiary,
+                onTertiary = Color.Black,
+                outline = DemonBorder,
+                error = Color(0xFFFF5252)
+            )
+        }
     }
 }
 
@@ -135,18 +155,22 @@ fun getMoodColorScheme(mood: MoodType, isDark: Boolean, isAmoled: Boolean = fals
 fun QuestDoTheme(
     mood: MoodType = MoodType.FOCUS,
     themeMode: ThemeMode = ThemeMode.SYSTEM,
+    isDemonMode: Boolean = false,
     content: @Composable () -> Unit
 ) {
+    val effectiveMood = if (isDemonMode) MoodType.DEMON else mood
     val systemDark = isSystemInDarkTheme()
-    val isDark = when (themeMode) {
-        ThemeMode.SYSTEM -> systemDark
-        ThemeMode.LIGHT -> false
-        ThemeMode.DARK -> true
-        ThemeMode.AMOLED -> true
+    val isDark = when {
+        isDemonMode || themeMode == ThemeMode.INFERNAL -> true
+        themeMode == ThemeMode.SYSTEM -> systemDark
+        themeMode == ThemeMode.LIGHT -> false
+        themeMode == ThemeMode.DARK -> true
+        themeMode == ThemeMode.AMOLED -> true
+        else -> systemDark
     }
     val isAmoled = themeMode == ThemeMode.AMOLED
 
-    val colorScheme = getMoodColorScheme(mood = mood, isDark = isDark, isAmoled = isAmoled)
+    val colorScheme = getMoodColorScheme(mood = effectiveMood, isDark = isDark, isAmoled = isAmoled)
 
     MaterialTheme(
         colorScheme = colorScheme,

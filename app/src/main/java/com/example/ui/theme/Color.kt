@@ -41,6 +41,18 @@ val CareSurfaceLight = Color(0xFFFFF1F2)
 val CareSurfaceDark = Color(0xFF24121E)
 val CareCardDark = Color(0xFF3B1E32)
 
+// Mood: DEMON (Hellfire Crimson, Lava Orange & Obsidian Brimstone)
+val DemonPrimaryLight = Color(0xFFDC2626)
+val DemonPrimaryDark = Color(0xFFFF2A3B)
+val DemonSecondary = Color(0xFFFF6D00)
+val DemonTertiary = Color(0xFFFFD600)
+val DemonSurfaceLight = Color(0xFFFFF1F1)
+val DemonSurfaceDark = Color(0xFF140205)
+val DemonCardDark = Color(0xFF24060B)
+val DemonCardLight = Color(0xFFFFE4E6)
+val DemonBorder = Color(0xFFFF3849)
+val DemonGlow = Color(0xFFFF1744)
+
 // AMOLED Backgrounds
 val AmoledBackground = Color(0xFF000000)
 val AmoledSurface = Color(0xFF0D0D11)

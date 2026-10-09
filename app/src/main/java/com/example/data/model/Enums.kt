@@ -11,14 +11,16 @@ enum class MoodType(val titleRu: String, val descriptionRu: String, val iconEmoj
     FOCUS("Фокус", "Максимальная концентрация и минимализм", "🎯"),
     CALM("Спокойствие", "Мягкий темп, дыхание и антистресс", "🌿"),
     OVERCOME("Преодоление", "Энергия воина, дисциплина и напор", "⚡"),
-    CARE("Забота о себе", "Теплота, признание усталости и баланс", "💖")
+    CARE("Забота о себе", "Теплота, признание усталости и баланс", "💖"),
+    DEMON("Адский Демон", "Черный юмор, огонь, сарказм и пинки", "😈")
 }
 
 enum class ThemeMode(val titleRu: String) {
     SYSTEM("Как в системе"),
     LIGHT("Светлая тема"),
     DARK("Темная тема"),
-    AMOLED("AMOLED Черная")
+    AMOLED("AMOLED Черная"),
+    INFERNAL("Адская (Кровавый Огонь)")
 }
 
 enum class AppIconStyle(val titleRu: String, val emoji: String) {
@@ -26,13 +28,15 @@ enum class AppIconStyle(val titleRu: String, val emoji: String) {
     TROPHY("Золотой Кубок", "🏆"),
     LOTUS("Дзен Лотос", "🪷"),
     CYBER("Кибернеон", "⚡"),
-    PHOENIX("Пламенный Феникс", "🔥")
+    PHOENIX("Пламенный Феникс", "🔥"),
+    DEMON("Адские Рожки", "😈")
 }
 
 enum class NotificationTone(val titleRu: String, val sampleMessage: String) {
     CARING("Заботливый друг", "Привет! Ты отлично справляешься. Давай сделаем один крошечный шаг?"),
     STRICT("Строгий наставник", "Уровень сам себя не пройдет. Соберись и закрой задачу!"),
-    MINDFUL("Осознанный помощник", "Заметь свое дыхание. Какое одно простое действие продвинет тебя вперед?")
+    MINDFUL("Осознанный помощник", "Заметь свое дыхание. Какое одно простое действие продвинет тебя вперед?"),
+    DEMON("Адский Демон 😈", "Слышишь, ленивый зад? Поднимайся с дивана или я поджарю твои несделанные квесты!")
 }
 
 enum class RecurrenceRule(val titleRu: String) {

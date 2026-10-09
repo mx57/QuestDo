@@ -99,7 +99,8 @@ object NotificationHelper {
         taskId: Long,
         title: String,
         category: String,
-        priorityTitle: String
+        priorityTitle: String,
+        isDemonTone: Boolean = false
     ) {
         val openAppIntent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
@@ -156,24 +157,34 @@ object NotificationHelper {
 
         val soundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
 
+        val notificationTitle = if (isDemonTone) {
+            "😈 Вставай, ленивый зад! Квест: $title"
+        } else {
+            "⏰ Пора выполнить квест: $title"
+        }
+
+        val notificationBody = if (isDemonTone) {
+            val roast = com.example.data.model.DemonMentorEngine.getRandomRoast()
+            "[$category • $priorityTitle]\n$title\n\n$roast"
+        } else {
+            "[$category • $priorityTitle]\n$title\n\nНе откладывайте на потом — закройте задачу сейчас и заработайте опыт!"
+        }
+
         val builder = NotificationCompat.Builder(context, CHANNEL_TASK_REMINDERS)
             .setSmallIcon(R.drawable.ic_launcher_foreground)
-            .setContentTitle("⏰ Пора выполнить квест: $title")
-            .setContentText("[$category • $priorityTitle] Сделайте первый шаг!")
-            .setStyle(
-                NotificationCompat.BigTextStyle()
-                    .bigText("[$category • $priorityTitle]\n$title\n\nНе откладывайте на потом — закройте задачу сейчас и заработайте опыт!")
-            )
+            .setContentTitle(notificationTitle)
+            .setContentText(if (isDemonTone) "Хватит тупить в потолок! $title" else "[$category • $priorityTitle] Сделайте первый шаг!")
+            .setStyle(NotificationCompat.BigTextStyle().bigText(notificationBody))
             .setPriority(NotificationCompat.PRIORITY_MAX)
             .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setAutoCancel(true)
-            .setColor(0xFFFFB300.toInt()) // Gold
+            .setColor(if (isDemonTone) 0xFFFF1744.toInt() else 0xFFFFB300.toInt())
             .setSound(soundUri)
-            .setVibrate(longArrayOf(0, 250, 150, 250, 150, 400))
+            .setVibrate(if (isDemonTone) longArrayOf(0, 150, 80, 150, 80, 450) else longArrayOf(0, 250, 150, 250, 150, 400))
             .setContentIntent(fullScreenPendingIntent)
             .setFullScreenIntent(fullScreenPendingIntent, true)
-            .addAction(R.drawable.ic_launcher_foreground, "💤 +5 мин", snoozePendingIntent)
-            .addAction(R.drawable.ic_launcher_foreground, "✅ Сделано", completePendingIntent)
+            .addAction(R.drawable.ic_launcher_foreground, if (isDemonTone) "💤 Отмазка (+5м)" else "💤 +5 мин", snoozePendingIntent)
+            .addAction(R.drawable.ic_launcher_foreground, if (isDemonTone) "🔥 Сжег квест!" else "✅ Сделано", completePendingIntent)
             .addAction(R.drawable.ic_launcher_foreground, "🔔 Открыть", openPendingIntent)
 
         val notificationManager = NotificationManagerCompat.from(context)

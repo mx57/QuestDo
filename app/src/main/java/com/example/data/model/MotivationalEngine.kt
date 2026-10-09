@@ -20,6 +20,7 @@ object MotivationalEngine {
         }
 
         return when (mood) {
+            MoodType.DEMON -> DemonMentorEngine.getDemonContextualQuote()
             MoodType.FOCUS -> when (timePeriod) {
                 "утро" -> MotivationalMessage(
                     "«Утро определяет день. Выбери главное действие до того, как мир потребует твоего внимания.»",

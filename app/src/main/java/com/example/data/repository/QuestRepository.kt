@@ -82,7 +82,10 @@ class QuestRepository(
                 BadgeAchievement("CENTURION", "Сотня подвигов", "Выполните 100 задач из бэклога", "👑"),
                 BadgeAchievement("SELF_CARE", "В гармонии с собой", "Активируйте режим заботы и выполните квест", "🌸"),
                 BadgeAchievement("BOSS_SLAYER", "Победитель Босса", "Сокрушите недельного Босса Прокрастинации", "🐉"),
-                BadgeAchievement("NIGHT_OWL", "Вечерний стратег", "Завершите квест в вечернее время", "🦉")
+                BadgeAchievement("NIGHT_OWL", "Вечерний стратег", "Завершите квест в вечернее время", "🦉"),
+                BadgeAchievement("DEMON_PACT_WIN", "Сделка с Дьяволом", "Обыграйте Демона в пакте и заберите 2x награду", "😈"),
+                BadgeAchievement("CAULDRON_PURGE", "Очищение в Котле", "Сожгите накопившиеся грехи лени в адском огне", "🫕"),
+                BadgeAchievement("DEMON_DEVOTEE", "Любимчик Преисподней", "Закройте 5 квестов под саркастичным надзором Демона", "🔱")
             )
             badgeDao.insertAllBadges(defaultBadges)
         }
@@ -544,6 +547,9 @@ class QuestRepository(
                     "FOCUS_50" -> if (profile.totalFocusMinutes >= 50) shouldUnlock = true
                     "CENTURION" -> if (profile.totalTasksCompleted >= 100) shouldUnlock = true
                     "SELF_CARE" -> if (profile.activeMood == MoodType.CARE && profile.totalQuestsCompleted >= 1) shouldUnlock = true
+                    "DEMON_PACT_WIN" -> if (profile.devilPactSuccesses >= 1) shouldUnlock = true
+                    "CAULDRON_PURGE" -> if (profile.cauldronSinsBurned >= 1) shouldUnlock = true
+                    "DEMON_DEVOTEE" -> if (profile.isDemonMode && profile.totalTasksCompleted >= 5) shouldUnlock = true
                     "NIGHT_OWL" -> {
                         val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
                         if (hour >= 20 || hour <= 4) shouldUnlock = true

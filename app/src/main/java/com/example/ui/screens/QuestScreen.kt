@@ -56,7 +56,14 @@ fun QuestScreen(
     onSelectEnergy: (Int) -> Unit,
     onAddNewTask: () -> Unit,
     onClaimRewardManual: () -> Unit,
-    onSaveTask: (TaskItem) -> Unit = {}
+    onSaveTask: (TaskItem) -> Unit = {},
+    onToggleDemonMode: (Boolean) -> Unit = {},
+    onTapDemonRoast: () -> Unit = {},
+    onOpenDevilsPact: () -> Unit = {},
+    onOpenCauldron: () -> Unit = {},
+    pactRemainingSeconds: Int = 0,
+    onCompletePactSuccess: () -> Unit = {},
+    onCancelPact: () -> Unit = {}
 ) {
     var showRouletteDialog by remember { mutableStateOf(false) }
     var showTemplatesDialog by remember { mutableStateOf(false) }
@@ -132,7 +139,7 @@ fun QuestScreen(
         }
 
         // Horizon Progress Visualizer Metaphor (togglable)
-        if (userProfile.showHorizon) {
+        if (userProfile.showHorizon && !userProfile.isDemonMode) {
             item {
                 HorizonProgressCard(
                     completedQuests = userProfile.totalQuestsCompleted,
@@ -141,13 +148,35 @@ fun QuestScreen(
             }
         }
 
-        // Dynamic Motivational Quote Card
+        // Active Devil's Pact Banner (when a wager is ongoing)
+        if (userProfile.devilPactActive) {
+            item {
+                ActiveDevilsPactBanner(
+                    userProfile = userProfile,
+                    remainingSeconds = pactRemainingSeconds,
+                    onCompletePactSuccess = onCompletePactSuccess,
+                    onCancelPact = onCancelPact
+                )
+            }
+        }
+
+        // Dynamic Motivational Quote Card OR Demon Mascot Card
         item {
-            MotivationalQuoteCard(
-                quote = currentQuote,
-                activeMood = userProfile.activeMood,
-                onOpenSOS = onOpenSOS
-            )
+            if (userProfile.isDemonMode) {
+                DemonLuciferMascotCard(
+                    userProfile = userProfile,
+                    onTapRoast = onTapDemonRoast,
+                    onOpenDevilsPact = onOpenDevilsPact,
+                    onOpenCauldron = onOpenCauldron,
+                    onDisableDemonMode = { onToggleDemonMode(false) }
+                )
+            } else {
+                MotivationalQuoteCard(
+                    quote = currentQuote,
+                    activeMood = userProfile.activeMood,
+                    onOpenSOS = onOpenSOS
+                )
+            }
         }
 
         // Quest Level Status Banner
@@ -178,6 +207,7 @@ fun QuestScreen(
         if (currentTasks.isEmpty()) {
             item {
                 EmptyQuestPlaceholder(
+                    isDemonMode = userProfile.isDemonMode,
                     onShuffle = onShuffleQuest,
                     onAddNewTask = onAddNewTask
                 )
@@ -1081,32 +1111,54 @@ fun QuestTaskCard(
 
 @Composable
 fun EmptyQuestPlaceholder(
+    isDemonMode: Boolean = false,
     onShuffle: () -> Unit,
     onAddNewTask: () -> Unit
 ) {
     Card(
         shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isDemonMode) Color(0xFF26050A) else MaterialTheme.colorScheme.surface
+        ),
+        border = if (isDemonMode) androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFFF1744)) else null,
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(
             modifier = Modifier.padding(28.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text("🎉", fontSize = 48.sp)
-            Spacer(modifier = Modifier.height(12.dp))
-            Text(
-                text = "Все активные квесты завершены!",
-                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center
-            )
-            Spacer(modifier = Modifier.height(6.dp))
-            Text(
-                text = "Вы очистили текущий уровень. Добавьте новые задачи или извлеките следующую пачку из бэклога.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center
-            )
+            if (isDemonMode) {
+                DemonImpAvatar(sizeDp = 56)
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    text = "Квестов нет! Расслабил булки?!",
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                    color = Color(0xFFFF5252),
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = "Люцик не потерпит пустого экрана! Немедленно нажми «Создать квест» или вытащи пачку из бэклога!",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color(0xFFFF8A80),
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                )
+            } else {
+                Text("🎉", fontSize = 48.sp)
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    text = "Все активные квесты завершены!",
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = "Вы очистили текущий уровень. Добавьте новые задачи или извлеките следующую пачку из бэклога.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                )
+            }
             Spacer(modifier = Modifier.height(18.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -1117,14 +1169,15 @@ fun EmptyQuestPlaceholder(
                     modifier = Modifier.weight(1f),
                     shape = RoundedCornerShape(14.dp)
                 ) {
-                    Text("Взять из бэклога")
+                    Text(if (isDemonMode) "Раскопать бэклог 🔥" else "Взять из бэклога")
                 }
                 Button(
                     onClick = onAddNewTask,
                     modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(14.dp)
+                    shape = RoundedCornerShape(14.dp),
+                    colors = if (isDemonMode) ButtonDefaults.buttonColors(containerColor = Color(0xFFD50000)) else ButtonDefaults.buttonColors()
                 ) {
-                    Text("Создать квест +")
+                    Text(if (isDemonMode) "Адский квест +" else "Создать квест +")
                 }
             }
         }

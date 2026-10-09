@@ -34,10 +34,16 @@ class AlarmReceiver : BroadcastReceiver() {
                         try {
                             val db = AppDatabase.getInstance(context)
                             val task = db.taskDao().getTaskById(taskId)
+                            val profile = db.userProfileDao().getUserProfile().firstOrNull()
+                            val isDemon = profile?.isDemonMode == true || profile?.notificationTone == com.example.data.model.NotificationTone.DEMON
                             if (task != null && !task.isCompleted) {
-                                NotificationHelper.showTaskReminder(context, taskId, title, category, priority)
-                                soundHelper.playAlarmAlert()
-                                soundHelper.triggerVibration("ALARM")
+                                NotificationHelper.showTaskReminder(context, taskId, title, category, priority, isDemonTone = isDemon)
+                                if (isDemon) {
+                                    soundHelper.playDemonLaugh()
+                                } else {
+                                    soundHelper.playAlarmAlert()
+                                }
+                                soundHelper.triggerVibration(if (isDemon) "DEMON" else "ALARM")
                                 com.example.AlarmAlertActivity.launchAlarm(context, task)
                             }
                         } catch (e: Exception) {

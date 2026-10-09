@@ -39,7 +39,16 @@ data class UserProfile(
     val totalTasksCompleted: Int = 0,
     val totalFocusMinutes: Int = 0,
     val equippedArtifactId: String = "SHIELD_AEGIS",
-    val unlockedArtifactIdsRaw: String = "SHIELD_AEGIS"
+    val unlockedArtifactIdsRaw: String = "SHIELD_AEGIS",
+    val isDemonMode: Boolean = false,
+    val devilPactActive: Boolean = false,
+    val devilPactTaskId: Long = 0L,
+    val devilPactTaskTitle: String = "",
+    val devilPactEndTime: Long = 0L,
+    val devilPactDurationMinutes: Int = 15,
+    val devilPactSuccesses: Int = 0,
+    val devilPactFailures: Int = 0,
+    val cauldronSinsBurned: Int = 0
 ) {
     val xpNeededForNextLevel: Int
         get() = level * 200
