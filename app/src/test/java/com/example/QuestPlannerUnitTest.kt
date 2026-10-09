@@ -5,6 +5,7 @@ import com.example.data.model.MoodType
 import com.example.data.model.RecurrenceRule
 import com.example.data.model.SubTask
 import com.example.data.model.TaskItem
+import com.example.util.RecurrenceHelper
 import org.junit.Assert.*
 import org.junit.Test
 import java.util.Calendar
@@ -51,6 +52,53 @@ class QuestPlannerUnitTest {
         cal.add(Calendar.DAY_OF_YEAR, 1)
         val nextDay = cal.get(Calendar.DAY_OF_YEAR)
         assertEquals((originalDay % 365) + 1, (nextDay - 1) % 365 + 1)
+    }
+
+    @Test
+    fun testRecurrenceHelperDaily() {
+        val baseCal = Calendar.getInstance().apply {
+            set(2026, Calendar.MARCH, 10, 10, 0, 0)
+        }
+        val currentDue = baseCal.timeInMillis
+        val nextDue = RecurrenceHelper.calculateNextDueDate(currentDue, RecurrenceRule.DAILY)
+
+        val nextCal = Calendar.getInstance().apply { timeInMillis = nextDue }
+        assertEquals(2026, nextCal.get(Calendar.YEAR))
+        assertEquals(Calendar.MARCH, nextCal.get(Calendar.MONTH))
+        assertEquals(11, nextCal.get(Calendar.DAY_OF_MONTH))
+        assertEquals(10, nextCal.get(Calendar.HOUR_OF_DAY))
+    }
+
+    @Test
+    fun testRecurrenceHelperWeekdaysSkippingWeekend() {
+        // March 13, 2026 is Friday
+        val fridayCal = Calendar.getInstance().apply {
+            set(2026, Calendar.MARCH, 13, 9, 30, 0)
+        }
+        val currentDue = fridayCal.timeInMillis
+        val nextDue = RecurrenceHelper.calculateNextDueDate(currentDue, RecurrenceRule.WEEKDAYS)
+
+        // Friday + Weekdays -> Monday March 16, 2026
+        val nextCal = Calendar.getInstance().apply { timeInMillis = nextDue }
+        assertEquals(2026, nextCal.get(Calendar.YEAR))
+        assertEquals(Calendar.MARCH, nextCal.get(Calendar.MONTH))
+        assertEquals(16, nextCal.get(Calendar.DAY_OF_MONTH))
+        assertEquals(Calendar.MONDAY, nextCal.get(Calendar.DAY_OF_WEEK))
+    }
+
+    @Test
+    fun testRecurrenceHelperWeeklyAndNone() {
+        val baseCal = Calendar.getInstance().apply {
+            set(2026, Calendar.MARCH, 10, 15, 0, 0)
+        }
+        val currentDue = baseCal.timeInMillis
+
+        val weeklyDue = RecurrenceHelper.calculateNextDueDate(currentDue, RecurrenceRule.WEEKLY)
+        val weeklyCal = Calendar.getInstance().apply { timeInMillis = weeklyDue }
+        assertEquals(17, weeklyCal.get(Calendar.DAY_OF_MONTH))
+
+        val noneDue = RecurrenceHelper.calculateNextDueDate(currentDue, RecurrenceRule.NONE)
+        assertEquals(currentDue, noneDue)
     }
 
     @Test
