@@ -183,6 +183,10 @@ class QuestRepository(
         taskDao.updateTask(task)
     }
 
+    suspend fun updateTasks(tasks: List<TaskItem>) = withContext(Dispatchers.IO) {
+        taskDao.updateTasks(tasks)
+    }
+
     suspend fun deleteTask(task: TaskItem) = withContext(Dispatchers.IO) {
         taskDao.deleteTask(task)
     }
@@ -364,9 +368,11 @@ class QuestRepository(
         val uncompleted = currentTasks.filter { !it.isCompleted }
 
         // Track postpones for uncompleted tasks
-        for (t in uncompleted) {
-            val newPostponeCount = t.postponeCount + 1
-            taskDao.updateTask(t.copy(postponeCount = newPostponeCount))
+        val updatedUncompleted = uncompleted.map { t ->
+            t.copy(postponeCount = t.postponeCount + 1)
+        }
+        if (updatedUncompleted.isNotEmpty()) {
+            taskDao.updateTasks(updatedUncompleted)
         }
 
         taskDao.clearCurrentQuest()
