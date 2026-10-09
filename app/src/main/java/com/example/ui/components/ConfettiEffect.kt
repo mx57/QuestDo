@@ -13,59 +13,14 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.rotate
 import kotlin.math.cos
 import kotlin.math.sin
-import kotlin.random.Random
-
-private enum class ParticleShape {
-    RIBBON, STAR, CIRCLE, COIN
-}
-
-private data class Particle(
-    val x: Float,
-    val initialY: Float,
-    val speed: Float,
-    val size: Float,
-    val color: Color,
-    val angle: Float,
-    val rotationSpeed: Float,
-    val swayAmplitude: Float,
-    val swayFrequency: Float,
-    val shape: ParticleShape
-)
 
 @Composable
 fun ConfettiEffect(
     modifier: Modifier = Modifier,
     particleCount: Int = 85
 ) {
-    val celebrationPalette = remember {
-        listOf(
-            Color(0xFFFFD700), // Gold
-            Color(0xFFFF9100), // Amber
-            Color(0xFFFF3D00), // Flame Orange
-            Color(0xFF8B5CF6), // Royal Purple
-            Color(0xFF38BDF8), // Sky Blue
-            Color(0xFF10B981), // Emerald
-            Color(0xFFF43F5E), // Rose Red
-            Color(0xFFFBBF24)  // Radiant Yellow
-        )
-    }
-
-    val particles = remember {
-        val shapes = ParticleShape.values()
-        List(particleCount) {
-            Particle(
-                x = Random.nextFloat(),
-                initialY = -0.15f - (Random.nextFloat() * 0.4f),
-                speed = 0.45f + Random.nextFloat() * 0.65f,
-                size = 10f + Random.nextFloat() * 16f,
-                color = celebrationPalette[Random.nextInt(celebrationPalette.size)],
-                angle = Random.nextFloat() * 360f,
-                rotationSpeed = (Random.nextFloat() - 0.5f) * 12f,
-                swayAmplitude = 18f + Random.nextFloat() * 26f,
-                swayFrequency = 2.5f + Random.nextFloat() * 3.5f,
-                shape = shapes[Random.nextInt(shapes.size)]
-            )
-        }
+    val particles = remember(particleCount) {
+        ConfettiParticleGenerator.generateParticles(particleCount)
     }
 
     val infiniteTransition = rememberInfiniteTransition(label = "confettiTransition")
