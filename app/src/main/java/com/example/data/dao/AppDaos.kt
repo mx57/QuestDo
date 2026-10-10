@@ -103,6 +103,9 @@ interface CustomRewardDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertReward(reward: CustomReward): Long
 
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAllRewards(rewards: List<CustomReward>): List<Long>
+
     @Update
     suspend fun updateReward(reward: CustomReward)
 
