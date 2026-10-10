@@ -541,6 +541,8 @@ class QuestRepository(
 
     private suspend fun checkBadges(profile: UserProfile) {
         val badges = badgeDao.getAllBadges().firstOrNull() ?: return
+        val unlockedToUpdate = mutableListOf<BadgeAchievement>()
+        val now = System.currentTimeMillis()
         for (b in badges) {
             if (!b.isUnlocked) {
                 var shouldUnlock = false
@@ -560,9 +562,12 @@ class QuestRepository(
                     }
                 }
                 if (shouldUnlock) {
-                    badgeDao.updateBadge(b.copy(isUnlocked = true, unlockedAt = System.currentTimeMillis()))
+                    unlockedToUpdate.add(b.copy(isUnlocked = true, unlockedAt = now))
                 }
             }
+        }
+        if (unlockedToUpdate.isNotEmpty()) {
+            badgeDao.updateBadges(unlockedToUpdate)
         }
     }
 
