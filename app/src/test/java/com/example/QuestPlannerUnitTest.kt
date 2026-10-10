@@ -1,5 +1,6 @@
 package com.example
 
+import com.example.data.model.CustomReward
 import com.example.data.model.MotivationalEngine
 import com.example.data.model.MoodType
 import com.example.data.model.RecurrenceRule
@@ -201,5 +202,23 @@ class QuestPlannerUnitTest {
         val roast = com.example.data.model.DemonMentorEngine.getRandomMascotTapRoast()
         assertNotNull(roast)
         assertTrue(roast.isNotBlank())
+    }
+
+    @Test
+    fun testChestRewardDefaultsFallbackAndCustomRewards() {
+        // When available rewards list is empty
+        val defaultOptions = ChestRewardDefaults.getRewardOptions(emptyList())
+        assertEquals(ChestRewardDefaults.DEFAULT_REWARD_OPTIONS, defaultOptions)
+        assertEquals(4, defaultOptions.size)
+
+        // When custom rewards are present
+        val customRewards = listOf(
+            CustomReward(title = "Чашка чая", costCoins = 10, iconEmoji = "🍵"),
+            CustomReward(title = "Прогулка в парке", costCoins = 20, iconEmoji = "")
+        )
+        val customOptions = ChestRewardDefaults.getRewardOptions(customRewards)
+        assertEquals(2, customOptions.size)
+        assertEquals("🍵 Чашка чая", customOptions[0])
+        assertEquals("Прогулка в парке", customOptions[1])
     }
 }
