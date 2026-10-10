@@ -100,9 +100,7 @@ class QuestRepository(
                 CustomReward(title = "Поиграть в любимую игру", costCoins = 60, iconEmoji = "🎮", description = "1 час в хорошей игре"),
                 CustomReward(title = "Купить желанную книгу", costCoins = 150, iconEmoji = "📚", description = "Инвестиция в знания и вдохновение")
             )
-            for (r in defaultRewards) {
-                customRewardDao.insertReward(r)
-            }
+            customRewardDao.insertAllRewards(defaultRewards)
         }
 
         // Check if there are tasks. If empty, seed rich sample tasks and form Quest #1!
