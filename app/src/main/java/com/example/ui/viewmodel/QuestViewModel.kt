@@ -13,6 +13,7 @@ import com.example.data.model.*
 import com.example.data.repository.QuestRepository
 import com.example.util.NotificationHelper
 import com.example.util.QuestAlarmScheduler
+import com.example.util.RecurrenceHelper
 import com.example.util.SoundEffectsHelper
 import com.example.util.SystemAlarmHelper
 import kotlinx.coroutines.Job
@@ -20,7 +21,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import java.util.Calendar
 
 class QuestViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -155,7 +155,7 @@ class QuestViewModel(application: Application) : AndroidViewModel(application) {
 
             // Recurrence support: if task was completed and has recurrence, schedule next occurrence
             if (!task.isCompleted && task.recurrence != RecurrenceRule.NONE && task.dueDate != null) {
-                val nextDue = calculateNextDueDate(task.dueDate, task.recurrence)
+                val nextDue = RecurrenceHelper.calculateNextDueDate(task.dueDate, task.recurrence)
                 val recurringTask = task.copy(
                     id = 0,
                     isCompleted = false,
@@ -180,21 +180,6 @@ class QuestViewModel(application: Application) : AndroidViewModel(application) {
                 }
             }
         }
-    }
-
-    private fun calculateNextDueDate(currentDueDate: Long, recurrence: RecurrenceRule): Long {
-        val cal = Calendar.getInstance().apply { timeInMillis = currentDueDate }
-        when (recurrence) {
-            RecurrenceRule.DAILY -> cal.add(Calendar.DAY_OF_YEAR, 1)
-            RecurrenceRule.WEEKDAYS -> {
-                do {
-                    cal.add(Calendar.DAY_OF_YEAR, 1)
-                } while (cal.get(Calendar.DAY_OF_WEEK) == Calendar.SATURDAY || cal.get(Calendar.DAY_OF_WEEK) == Calendar.SUNDAY)
-            }
-            RecurrenceRule.WEEKLY -> cal.add(Calendar.WEEK_OF_YEAR, 1)
-            RecurrenceRule.NONE -> {}
-        }
-        return cal.timeInMillis
     }
 
     fun claimLevelReward(chosenReward: String) {
