@@ -64,14 +64,17 @@ object DataExportImportEngine {
 
     fun parseJsonTasks(jsonStr: String): List<TaskItem> {
         val result = mutableListOf<TaskItem>()
+        val trimmed = jsonStr.trim()
+        if (trimmed.isEmpty()) return result
+
         try {
-            val trimmed = jsonStr.trim()
-            val array = if (trimmed.startsWith("[")) {
+            val array: JSONArray = if (trimmed.startsWith("[")) {
                 JSONArray(trimmed)
             } else {
                 val root = JSONObject(trimmed)
                 if (root.has("tasks")) root.getJSONArray("tasks") else JSONArray()
             }
+
             for (i in 0 until array.length()) {
                 val item = array.getJSONObject(i)
                 val title = item.optString("title", "Задача")
