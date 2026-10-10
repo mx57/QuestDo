@@ -261,52 +261,19 @@ class SoundEffectsHelper(private val context: Context) {
                 while (isActive) {
                     when {
                         soundType.contains("дождя") -> {
-                            // Soft low-passed pinkish noise with occasional droplet impulses
-                            for (i in buffer.indices) {
-                                val white = (random.nextDouble() * 2.0 - 1.0)
-                                filterState = 0.94 * filterState + 0.06 * white
-                                val droplet = if (random.nextInt(1200) == 0) (random.nextDouble() * 0.4) else 0.0
-                                val sample = (filterState * 0.25 + droplet).coerceIn(-1.0, 1.0)
-                                buffer[i] = (sample * 16000).toInt().toShort()
-                            }
+                            filterState = generateRainBuffer(buffer, random, filterState)
                         }
                         soundType.contains("Белый") -> {
-                            // Gentle broadband soothing noise
-                            for (i in buffer.indices) {
-                                val white = (random.nextDouble() * 2.0 - 1.0)
-                                filterState = 0.85 * filterState + 0.15 * white
-                                buffer[i] = (filterState * 7000).toInt().toShort()
-                            }
+                            filterState = generateWhiteNoiseBuffer(buffer, random, filterState)
                         }
                         soundType.contains("Костер") -> {
-                            // Low hum + crackle sparks
-                            for (i in buffer.indices) {
-                                val white = (random.nextDouble() * 2.0 - 1.0)
-                                filterState = 0.96 * filterState + 0.04 * white
-                                val crackle = if (random.nextInt(350) == 0) (random.nextDouble() * 0.8 - 0.4) else 0.0
-                                val sample = (filterState * 0.2 + crackle).coerceIn(-1.0, 1.0)
-                                buffer[i] = (sample * 15000).toInt().toShort()
-                            }
+                            filterState = generateCampfireBuffer(buffer, random, filterState)
                         }
                         soundType.contains("Космос") -> {
-                            // Soft 432 Hz warm binaural drone
-                            val freq = 108.0 // deep soothing octave
-                            for (i in buffer.indices) {
-                                val sine = Math.sin(phase)
-                                phase += 2.0 * Math.PI * freq / sampleRate
-                                if (phase > 2.0 * Math.PI) phase -= 2.0 * Math.PI
-                                val noise = (random.nextDouble() * 2.0 - 1.0) * 0.02
-                                val sample = (sine * 0.18 + noise).coerceIn(-1.0, 1.0)
-                                buffer[i] = (sample * 18000).toInt().toShort()
-                            }
+                            phase = generateCosmosBuffer(buffer, random, phase, sampleRate)
                         }
                         else -> {
-                            // Default soft whisper
-                            for (i in buffer.indices) {
-                                val white = (random.nextDouble() * 2.0 - 1.0)
-                                filterState = 0.90 * filterState + 0.10 * white
-                                buffer[i] = (filterState * 5000).toInt().toShort()
-                            }
+                            filterState = generateDefaultWhisperBuffer(buffer, random, filterState)
                         }
                     }
                     track.write(buffer, 0, buffer.size)
@@ -337,5 +304,67 @@ class SoundEffectsHelper(private val context: Context) {
             // Ignore
         }
         ambientTrack = null
+    }
+
+    internal fun generateRainBuffer(buffer: ShortArray, random: Random, initialFilterState: Double): Double {
+        var filterState = initialFilterState
+        // Soft low-passed pinkish noise with occasional droplet impulses
+        for (i in buffer.indices) {
+            val white = (random.nextDouble() * 2.0 - 1.0)
+            filterState = 0.94 * filterState + 0.06 * white
+            val droplet = if (random.nextInt(1200) == 0) (random.nextDouble() * 0.4) else 0.0
+            val sample = (filterState * 0.25 + droplet).coerceIn(-1.0, 1.0)
+            buffer[i] = (sample * 16000).toInt().toShort()
+        }
+        return filterState
+    }
+
+    internal fun generateWhiteNoiseBuffer(buffer: ShortArray, random: Random, initialFilterState: Double): Double {
+        var filterState = initialFilterState
+        // Gentle broadband soothing noise
+        for (i in buffer.indices) {
+            val white = (random.nextDouble() * 2.0 - 1.0)
+            filterState = 0.85 * filterState + 0.15 * white
+            buffer[i] = (filterState * 7000).toInt().toShort()
+        }
+        return filterState
+    }
+
+    internal fun generateCampfireBuffer(buffer: ShortArray, random: Random, initialFilterState: Double): Double {
+        var filterState = initialFilterState
+        // Low hum + crackle sparks
+        for (i in buffer.indices) {
+            val white = (random.nextDouble() * 2.0 - 1.0)
+            filterState = 0.96 * filterState + 0.04 * white
+            val crackle = if (random.nextInt(350) == 0) (random.nextDouble() * 0.8 - 0.4) else 0.0
+            val sample = (filterState * 0.2 + crackle).coerceIn(-1.0, 1.0)
+            buffer[i] = (sample * 15000).toInt().toShort()
+        }
+        return filterState
+    }
+
+    internal fun generateCosmosBuffer(buffer: ShortArray, random: Random, initialPhase: Double, sampleRate: Int): Double {
+        var phase = initialPhase
+        val freq = 108.0 // deep soothing octave
+        for (i in buffer.indices) {
+            val sine = Math.sin(phase)
+            phase += 2.0 * Math.PI * freq / sampleRate
+            if (phase > 2.0 * Math.PI) phase -= 2.0 * Math.PI
+            val noise = (random.nextDouble() * 2.0 - 1.0) * 0.02
+            val sample = (sine * 0.18 + noise).coerceIn(-1.0, 1.0)
+            buffer[i] = (sample * 18000).toInt().toShort()
+        }
+        return phase
+    }
+
+    internal fun generateDefaultWhisperBuffer(buffer: ShortArray, random: Random, initialFilterState: Double): Double {
+        var filterState = initialFilterState
+        // Default soft whisper
+        for (i in buffer.indices) {
+            val white = (random.nextDouble() * 2.0 - 1.0)
+            filterState = 0.90 * filterState + 0.10 * white
+            buffer[i] = (filterState * 5000).toInt().toShort()
+        }
+        return filterState
     }
 }

@@ -32,6 +32,22 @@ import com.example.ui.theme.GoldAccent
 import com.example.ui.theme.StreakFire
 import com.example.ui.theme.XpPurple
 
+object ChestRewardDefaults {
+    val DEFAULT_REWARD_OPTIONS = listOf(
+        "☕ Вкусный кофе или чай",
+        "🛋️ 15 минут законного отдыха",
+        "🎬 Серия любимого сериала",
+        "🚶 Небольшая прогулка на свежем воздухе"
+    )
+
+    fun getRewardOptions(availableRewards: List<CustomReward>): List<String> {
+        val customOptions = availableRewards.map { reward ->
+            if (reward.iconEmoji.isNotBlank()) "${reward.iconEmoji} ${reward.title}" else reward.title
+        }
+        return if (customOptions.isNotEmpty()) customOptions else DEFAULT_REWARD_OPTIONS
+    }
+}
+
 @Composable
 fun ChestRewardDialog(
     level: QuestLevel,
@@ -40,7 +56,12 @@ fun ChestRewardDialog(
     onDismiss: () -> Unit
 ) {
     var isChestOpened by remember { mutableStateOf(false) }
-    var selectedRewardTitle by remember { mutableStateOf("15 минут отдыха и чашка чая") }
+    val rewardOptions = remember(availableRewards) {
+        ChestRewardDefaults.getRewardOptions(availableRewards)
+    }
+    var selectedRewardTitle by remember(rewardOptions) {
+        mutableStateOf(rewardOptions.firstOrNull() ?: "")
+    }
 
     val infiniteTransition = rememberInfiniteTransition(label = "sunburst")
     val rayRotation by infiniteTransition.animateFloat(
@@ -220,20 +241,13 @@ fun ChestRewardDialog(
                         modifier = Modifier.fillMaxWidth()
                     )
 
-                    val defaultOptions = listOf(
-                        "☕ Вкусный кофе или чай",
-                        "🛋️ 15 минут законного отдыха",
-                        "🎬 Серия любимого сериала",
-                        "🚶 Небольшая прогулка на свежем воздухе"
-                    )
-
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(vertical = 8.dp),
                         verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        defaultOptions.forEach { opt ->
+                        rewardOptions.forEach { opt ->
                             val isSelected = selectedRewardTitle == opt
                             Surface(
                                 shape = RoundedCornerShape(12.dp),
