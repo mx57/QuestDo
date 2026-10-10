@@ -43,6 +43,9 @@ interface TaskDao {
     @Update
     suspend fun updateTask(task: TaskItem)
 
+    @Update
+    suspend fun updateTasks(tasks: List<TaskItem>)
+
     @Delete
     suspend fun deleteTask(task: TaskItem)
 
@@ -120,4 +123,7 @@ interface BadgeDao {
 
     @Update
     suspend fun updateBadge(badge: BadgeAchievement)
+
+    @Update
+    suspend fun updateBadges(badges: List<BadgeAchievement>)
 }
