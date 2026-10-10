@@ -10,11 +10,11 @@ import com.example.data.model.TaskItem
 import com.example.data.repository.QuestRepository
 import com.example.util.NotificationHelper
 import com.example.util.QuestAlarmScheduler
+import com.example.util.RecurrenceHelper
 import com.example.util.SoundEffectsHelper
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import java.util.Calendar
 
 class TaskActionReceiver : BroadcastReceiver() {
 
@@ -43,7 +43,7 @@ class TaskActionReceiver : BroadcastReceiver() {
 
                             // Handle recurrence if configured
                             if (task.recurrence != RecurrenceRule.NONE && task.dueDate != null) {
-                                val nextDue = calculateNextDueDate(task.dueDate, task.recurrence)
+                                val nextDue = RecurrenceHelper.calculateNextDueDate(task.dueDate, task.recurrence)
                                 val recurringTask = task.copy(
                                     id = 0,
                                     isCompleted = false,
@@ -85,20 +85,5 @@ class TaskActionReceiver : BroadcastReceiver() {
                 Toast.makeText(context, "💤 Будильник отложен на 5 минут", Toast.LENGTH_SHORT).show()
             }
         }
-    }
-
-    private fun calculateNextDueDate(currentDueDate: Long, recurrence: RecurrenceRule): Long {
-        val cal = Calendar.getInstance().apply { timeInMillis = currentDueDate }
-        when (recurrence) {
-            RecurrenceRule.DAILY -> cal.add(Calendar.DAY_OF_YEAR, 1)
-            RecurrenceRule.WEEKDAYS -> {
-                do {
-                    cal.add(Calendar.DAY_OF_YEAR, 1)
-                } while (cal.get(Calendar.DAY_OF_WEEK) == Calendar.SATURDAY || cal.get(Calendar.DAY_OF_WEEK) == Calendar.SUNDAY)
-            }
-            RecurrenceRule.WEEKLY -> cal.add(Calendar.WEEK_OF_YEAR, 1)
-            RecurrenceRule.NONE -> {}
-        }
-        return cal.timeInMillis
     }
 }
